@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#F2F5F6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="恵比寿ランチ">
+<meta name="format-detection" content="telephone=no">
+<title>恵比寿ランチマップ | プライムスクエアタワー発</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  :root{
+    --ink:#17242D; --ink2:#4A5A66; --line:#DDE4E8; --bg:#F2F5F6; --card:#FFFFFF;
+    --teishoku:#2E7D5B; --ramen:#C0392B; --soba:#8E6A3A; --curry:#D98E04;
+    --chuka:#B03A5B; --sushi:#2B6CB0; --italian:#7B5EA7; --cafe:#3D8F90;
+    --ok:#2E7D5B; --warn:#C0392B;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic",Meiryo,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 16px 60px}
+
+  header{padding:26px 0 14px;border-bottom:2px solid var(--ink)}
+  .kicker{font-size:11px;letter-spacing:.22em;color:var(--ink2);font-weight:700}
+  h1{font-size:clamp(22px,3.4vw,34px);font-weight:800;letter-spacing:.02em;margin:2px 0 4px}
+  h1 .num{color:var(--curry)}
+  .sub{font-size:12.5px;color:var(--ink2)}
+  .clock{font-variant-numeric:tabular-nums;font-weight:700}
+
+  /* filters */
+  .filters{position:sticky;top:0;z-index:40;background:var(--bg);padding:12px 0 10px;border-bottom:1px solid var(--line)}
+  .frow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+  .flabel{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--ink2);width:64px;flex-shrink:0}
+  .chip{border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:12.5px;cursor:pointer;color:var(--ink2);font-weight:600;transition:.15s}
+  .chip:hover{border-color:var(--ink2)}
+  .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .chip .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px}
+  .frow select{border:1.5px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;background:var(--card);color:var(--ink)}
+  .switch{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;cursor:pointer;user-select:none}
+  .switch input{accent-color:var(--ink);width:15px;height:15px}
+  .count{margin-left:auto;font-size:12px;color:var(--ink2)}
+  .count b{font-size:15px;color:var(--ink)}
+
+  /* layout */
+  .main{display:grid;grid-template-columns:minmax(340px,46%) 1fr;gap:18px;margin-top:16px;align-items:start}
+  @media(max-width:860px){.main{grid-template-columns:1fr}}
+
+  /* map */
+  .mapbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;position:sticky;top:118px}
+  @media(max-width:860px){.mapbox{position:static}}
+  #lmap{width:100%;height:540px;border-radius:10px;z-index:1;background:#E8EDEF}
+  @media(max-width:860px){#lmap{height:400px}}
+  .maplegend{display:flex;flex-wrap:wrap;gap:8px 12px;padding:10px 6px 2px;font-size:11px;color:var(--ink2);align-items:center}
+  .maplegend span{display:flex;align-items:center;gap:4px}
+  .maplegend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .maplegend .switch{margin-left:auto;font-size:11.5px}
+  .tower-icon{background:var(--ink);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)}
+  .ring-label{font-size:10.5px;font-weight:700;color:#7C8A93;background:rgba(255,255,255,.85);padding:1px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 0 3px rgba(0,0,0,.1)}
+  .leaflet-tooltip.shop-tip{font-family:inherit;font-size:12px;font-weight:700;color:var(--ink)}
+  .mapfallback{padding:40px 20px;text-align:center;font-size:13px;color:var(--ink2)}
+
+  /* list */
+  .cards{display:flex;flex-direction:column;gap:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;transition:.15s;position:relative;border-left:5px solid var(--line)}
+  .card:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(23,36,45,.08)}
+  .card.closedToday{opacity:.55}
+  .c-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .c-name{font-size:16px;font-weight:800}
+  .badge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;color:#fff}
+  .pricetag{font-size:11.5px;color:var(--ink2);font-weight:700}
+  .c-desc{font-size:12.5px;color:var(--ink2);margin:4px 0 8px}
+  .c-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;align-items:center}
+  .meta-item b{font-variant-numeric:tabular-nums}
+  .stay-ok{color:var(--ok);font-weight:700}
+  .stay-tight{color:var(--warn);font-weight:700}
+  .gstar{color:#B8860B;font-weight:700}
+  .teamstar{color:var(--curry);font-weight:700}
+  .openbadge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:4px}
+  .open-now{background:#E3F2EA;color:var(--ok)}
+  .open-later{background:#EEF1F3;color:var(--ink2)}
+  .closed-day{background:#F9E8E6;color:var(--warn)}
+  .empty{padding:40px;text-align:center;color:var(--ink2);font-size:13.5px;background:var(--card);border-radius:14px;border:1px dashed var(--line)}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(23,36,45,.5);z-index:100;display:none;align-items:flex-end;justify-content:center}
+  @media(min-width:640px){.overlay{align-items:center}}
+  .overlay.show{display:flex}
+  .modal{background:#fff;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:22px 22px 30px}
+  @media(min-width:640px){.modal{border-radius:18px}}
+  .m-close{float:right;border:none;background:var(--bg);width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--ink2)}
+  .m-name{font-size:21px;font-weight:800;margin:4px 0 2px}
+  .m-sub{font-size:12.5px;color:var(--ink2);margin-bottom:10px}
+  .m-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+  .m-cell{background:var(--bg);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--ink2)}
+  .m-cell b{display:block;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .price-detail{margin:12px 0;background:#FFF9E9;border:1px solid #E8D9A8;border-radius:12px;padding:12px 14px}
+  .price-detail-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .price-detail-title{font-size:12px;font-weight:800;letter-spacing:.08em;color:#7A5E12}
+  .price-detail-main{font-size:22px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+  .price-detail-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px;font-size:12px;color:var(--ink2)}
+  .price-detail-meta b{display:block;color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums}
+  .price-detail-note{margin-top:8px;padding-top:8px;border-top:1px dashed #D8C98F;font-size:11px;color:#7A5E12}
+  @media(max-width:420px){.price-detail-meta{grid-template-columns:1fr}}
+  .m-link{display:inline-block;margin:4px 0 14px;font-size:13px;font-weight:700;color:var(--sushi);text-decoration:none;border-bottom:1.5px solid currentColor}
+  .m-h{font-size:13px;font-weight:800;letter-spacing:.1em;margin:16px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+  .rev{padding:9px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .rev-head{display:flex;gap:8px;align-items:center;margin-bottom:2px}
+  .rev-stars{color:var(--curry);letter-spacing:1px}
+  .rev-name{font-weight:700;font-size:12px}
+  .rev-date{font-size:11px;color:var(--ink2)}
+  .rev-yen{font-size:11.5px;font-weight:700;color:#2E7D5B;background:#E3F2EA;padding:1px 7px;border-radius:4px}
+  .photostrip{display:flex;gap:6px;overflow-x:auto;margin:2px 0 10px;padding-bottom:4px}
+  .photostrip img{height:112px;border-radius:8px;cursor:zoom-in;flex:0 0 auto;border:1px solid var(--line)}
+  .setkey{display:inline-block;font-size:12px;font-weight:700;color:var(--sushi);text-decoration:none;border:1.5px dashed var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+  .starpick{display:flex;gap:4px;margin:6px 0 10px}
+  .rev-photo{width:88px;height:88px;object-fit:cover;border-radius:8px;margin-top:6px;cursor:zoom-in;border:1px solid var(--line)}
+  .c-thumb{position:absolute;right:14px;top:14px;width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+  .card.hasThumb{padding-right:88px}
+  .photolabel{display:inline-block;font-size:12px;font-weight:700;color:var(--ink2);border:1.5px dashed var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;margin-bottom:8px}
+  .photolabel input{display:none}
+  .lightbox{position:fixed;inset:0;background:rgba(23,36,45,.85);z-index:200;display:none;align-items:center;justify-content:center;cursor:zoom-out}
+  .lightbox.show{display:flex}
+  .lightbox img{max-width:92vw;max-height:88vh;border-radius:10px}
+  .starpick button{font-size:26px;background:none;border:none;cursor:pointer;color:#D7DEE2;transition:.1s}
+  .starpick button.lit{color:var(--curry)}
+  .fform input,.fform textarea{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;margin-bottom:8px}
+  .fform textarea{resize:vertical;min-height:60px}
+  .btn{background:var(--ink);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13.5px;font-weight:700;cursor:pointer}
+  .btn:disabled{opacity:.4;cursor:default}
+  .notice{font-size:11px;color:var(--ink2);margin-top:6px}
+  .foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink2)}
+  .foot a{color:var(--sushi);text-decoration:none;font-weight:700}
+  .banner{background:#FBF3DC;border:1px solid #E8D9A8;color:#7A5E12;font-size:12px;padding:8px 12px;border-radius:8px;margin-top:10px;display:none}
+  /* ===== スマホ最適化 ===== */
+  @media(max-width:640px){
+    .wrap{padding:0 12px calc(40px + env(safe-area-inset-bottom))}
+    header{padding:16px 0 10px}
+    h1{font-size:21px}
+    .sub{font-size:11px}
+    /* チップ行は折り返さず横スクロール(縦の場所を節約) */
+    .frow{flex-wrap:nowrap;align-items:center}
+    .flabel{width:42px;font-size:10px}
+    #catChips,#priceChips,#walkChips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 0}
+    #catChips::-webkit-scrollbar,#priceChips::-webkit-scrollbar,#walkChips::-webkit-scrollbar{display:none}
+    .chip{padding:8px 13px;font-size:12.5px;white-space:nowrap}
+    .frow select{padding:8px 6px}
+    .switch{white-space:nowrap}
+    .count{display:none}
+    #lmap{height:52vh;min-height:300px;max-height:440px}
+    .card{padding:12px 13px}
+    .c-name{font-size:15px}
+    .c-meta{font-size:11.5px;gap:5px 10px}
+    .m-close{width:40px;height:40px;font-size:18px}
+    .starpick button{font-size:32px;padding:2px 4px}
+    /* iOSの自動ズーム防止(16px未満のinputで発生) */
+    .fform input,.fform textarea{font-size:16px}
+    .photostrip img{height:96px}
+    .maplegend{font-size:10px;gap:6px 9px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">EBISU PRIME SQUARE TOWER ─ LUNCH RADIUS MAP</div>
+  <h1>恵比寿ランチマップ <span class="num" id="shopTotal"></span>軒</h1>
+  <div class="sub">渋谷区広尾1-1-39 恵比寿プライムスクエアタワー起点/昼休み60分で往復できる徒歩圏・ランチ営業店のみ掲載 ─ <span class="clock" id="clock"></span></div>
+</header>
+
+<div class="filters">
+  <div class="frow">
+    <span class="flabel">カテゴリ</span>
+    <div id="catChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
+  <div class="frow">
+    <span class="flabel">価格帯</span>
+    <div id="priceChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
+  <div class="frow">
+    <span class="flabel">距離</span>
+    <div id="walkChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
+  <div class="frow">
+    <span class="flabel">表示</span>
+    <label class="switch"><input type="checkbox" id="openToggle" checked>本日営業の店のみ</label>
+    <select id="sortSel">
+      <option value="dist">近い順</option>
+      <option value="g">Google評価順</option>
+      <option value="team">マイ評価順</option>
+      <option value="stay">滞在時間が長い順</option>
+    </select>
+    <span class="count"><b id="countNum">0</b> 軒表示中</span>
+  </div>
+  <div class="banner" id="storageBanner"></div>
+</div>
+
+<div class="main">
+  <div class="mapbox">
+    <div id="lmap" role="img" aria-label="ランチマップ"></div>
+    <div class="maplegend" id="legend"></div>
+  </div>
+  <div>
+    <div class="cards" id="cards"></div>
+    <div class="empty" id="emptyMsg" style="display:none">条件に合う店がありません。フィルタを緩めてみてください。</div>
+  </div>
+</div>
+
+<div class="foot">記録はこの端末のブラウザに保存されます ─ <a href="javascript:void(0)" onclick="exportReviews()">バックアップ書出し</a> / <a href="javascript:void(0)" onclick="importReviews()">取込み</a> / <a href="javascript:void(0)" onclick="setGKey()">店舗写真の表示設定(Google APIキー)</a></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('show')"><img id="lightboxImg" alt="料理写真"></div>
+
+<script>
+/* ================= データ ================= */
+const ORIGIN = {lat:35.650109, lng:139.7125988}; // 恵比寿プライムスクエアタワー(広尾1-1-39)
+const STATION = {lat:35.6467, lng:139.7101, name:'恵比寿駅'};
+
+const CATS = {
+  '定食・和食': '#2E7D5B',
+  'ラーメン・麺': '#C0392B',
+  'そば・うどん': '#8E6A3A',
+  'カレー': '#B7950B',
+  '中華': '#B03A5B',
+  '寿司・海鮮': '#2B6CB0',
+  '肉・揚げ物': '#5D4037',
+  'アジア・エスニック': '#6B8E23',
+  'バーガー・サンド': '#E2711D',
+  'イタリアン・洋食': '#7B5EA7',
+  'カフェ・軽食': '#3D8F90',
+  '弁当・テイクアウト': '#5B7083',
+};
+const PRICES = {1:'〜1,000円', 2:'1,000〜1,500円', 3:'1,500〜2,500円', 4:'2,500円〜'};
+
+// hours: [月,火,水,木,金,土,日] 各要素 [開始分,終了分] または null(定休)
+// ランチ帯に関係する営業窓のみ
+const D = (s,e)=>[s,e];
+const SHOPS = [
+{id:'ais', name:"ai's", cat:'イタリアン・洋食', lat:35.6499856, lng:139.7121179, price:3, g:4.5, gn:102,
+ desc:'前菜・フォカッチャ・パスタ・デザート付きのランチセット。タワーのほぼ隣で移動時間ほぼゼロ。',
+ hours:[null,D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),null], hoursText:'火〜土 11:30-15:30/月・日休', pid:'ChIJE9QQ_26LGGARVXG4J6v116k'},
+{id:'tsujita', name:'つじ田 恵比寿店', cat:'ラーメン・麺', lat:35.6483496, lng:139.7105840, price:2, g:4.6, gn:1398,
+ desc:'濃厚つけ麺の有名店。席数が多く回転も速いので昼休みでも安心。',
+ hours:[D(660,1020),D(660,1020),D(660,1020),D(660,1020),D(660,1020),D(660,1020),D(660,1020)], hoursText:'毎日 11:00〜(通し営業)', pid:'ChIJPUoTyFuLGGAR5nFvk1V04d0'},
+{id:'kamuro', name:'恵比寿らぁ麺屋 つなぎ 別邸 かむろ', cat:'ラーメン・麺', lat:35.6478743, lng:139.7085004, price:2, g:4.3, gn:1159,
+ desc:'鶏白湯の名店。クリーミーで野菜もたっぷり、ミニトマトが名脇役。',
+ hours:[D(690,1020),D(690,1020),D(690,1020),D(690,1020),D(690,1020),D(690,1020),D(690,1020)], hoursText:'毎日 11:30〜(通し営業)', pid:'ChIJSfbmDEGLGGAR_VQXt-ekDIs'},
+{id:'hibari', name:'味噌らーめん 柿田川ひばり 恵比寿店', cat:'ラーメン・麺', lat:35.6465397, lng:139.7076616, price:2, g:4.1, gn:773,
+ desc:'味噌専門。開店前から並ぶ人気店なので11:30着推奨。',
+ hours:[D(690,1020),D(690,1020),D(690,1020),D(690,1020),D(690,1020),D(690,1020),D(690,1020)], hoursText:'毎日 11:30〜(通し営業)', pid:'ChIJFShgMaSLGGARyigc7NnegZA'},
+{id:'jinrui', name:'人類みな麺類 東京本店', cat:'ラーメン・麺', lat:35.6490168, lng:139.7067590, price:2, g:4.0, gn:1231,
+ desc:'黒醤油「micro」が看板。分厚いチャーシューと個性派スープ。現金のみ。',
+ hours:[D(660,1020),D(660,1020),D(660,1020),D(660,1020),D(660,1020),D(600,1020),D(600,1020)], hoursText:'毎日 11:00〜(通し営業)', pid:'ChIJMW4u9rSLGGARulonfj5zXZ0'},
+{id:'tsunagi', name:'つなぎ 本店', cat:'ラーメン・麺', lat:35.6477763, lng:139.7116802, price:2, g:3.8, gn:847,
+ desc:'辛味噌・まぜそばが人気。朝7時から通し営業で時間をずらせるのが強み。',
+ hours:[D(420,1020),D(420,1020),D(420,1020),D(420,1020),D(420,1020),D(420,1020),D(420,1020)], hoursText:'毎日 7:00〜(通し営業)', pid:'ChIJIUoGgmqLGGARQxxhkzM5c1U'},
+{id:'kozuchi', name:'こづち', cat:'定食・和食', lat:35.6478398, lng:139.7107436, price:1, g:4.0, gn:811,
+ desc:'昭和42年から続く大衆食堂。定食800円前後・豚汁が名物。現金のみ。',
+ hours:[D(630,1080),D(630,1080),D(630,1080),D(630,1080),D(630,1080),D(630,1080),null], hoursText:'月〜土 10:30-18:00/日休', pid:'ChIJUTX1zEGLGGARtt0lT90Q100'},
+{id:'nakayoshi', name:'なかよし 恵比寿本店', cat:'定食・和食', lat:35.6477740, lng:139.7081390, price:2, g:4.0, gn:753,
+ desc:'土鍋炊きごはんの定食屋。チキン南蛮1,300円前後。行列は回転早め。',
+ hours:[D(660,1320),D(660,1320),D(660,1320),D(660,1320),D(660,1320),D(660,1320),D(660,1320)], hoursText:'毎日 11:00-22:00', pid:'ChIJwbCQB1CLGGARX6lrxDGFWts'},
+{id:'hanare', name:'なかよし はなれ(宿堂)', cat:'定食・和食', lat:35.6470243, lng:139.7144447, price:2, g:3.9, gn:573,
+ desc:'本店より近い側の姉妹店。ボリューム定食・ごはんおかわり無料。',
+ hours:[D(660,1320),D(660,1320),D(660,1320),D(660,1320),D(660,1320),D(660,1320),D(660,1320)], hoursText:'毎日 11:00-22:00', pid:'ChIJTVdOzkaLGGARAAslkWJ4dq8'},
+{id:'fu', name:'風 定食屋(ふう食堂)', cat:'定食・和食', lat:35.6448574, lng:139.7119804, price:2, g:3.6, gn:301,
+ desc:'小鉢を自分で選ぶセルフ食堂スタイル。朝から14:30まで。',
+ hours:[D(450,870),D(450,870),null,D(450,870),D(450,870),D(450,990),D(450,990)], hoursText:'7:30-14:30/水休', pid:'ChIJ58b7X8CLGGARFiLY6On6xRc'},
+{id:'yakizakana', name:'えびす焼魚食堂', cat:'定食・和食', lat:35.6454213, lng:139.7167583, price:3, g:4.4, gn:74,
+ desc:'焼魚定食の専門店。トロサバ塩焼き1,500円前後、ごはん・味噌汁おかわり1回無料。',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),null], hoursText:'月〜土 11:30-15:00/日休', pid:'ChIJE3jlVAaLGGARzXvIBeVDmvY'},
+{id:'tanbei', name:'釜元たん兵衛', cat:'定食・和食', lat:35.6458511, lng:139.7080850, price:3, g:4.1, gn:379,
+ desc:'牛タン×一人用羽釜ごはん。煮込みおかわり無料。券売機制で提供も速い。',
+ hours:[D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),D(660,1320),D(660,1320)], hoursText:'毎日 11:00-15:30(平日)', pid:'ChIJzVqTOB-LGGARkWDy44KuWtA'},
+{id:'kaoriya', name:'板蕎麦 香り家', cat:'そば・うどん', lat:35.6456878, lng:139.7119583, price:2, g:4.3, gn:1391,
+ desc:'太打ち板そばと絶品海老天。ランチセットのコスパ良好。',
+ hours:[D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930)], hoursText:'毎日 11:30-15:30', pid:'ChIJHXS5UxWLGGARvvtsf6Hh-I8'},
+{id:'satake', name:'十割蕎麦 さたけ', cat:'そば・うどん', lat:35.6478136, lng:139.7098363, price:1, g:4.3, gn:1898,
+ desc:'十割そばが立ち食い価格。ワカメ入れ放題。最速ランチ枠。',
+ hours:[D(630,1305),D(630,1305),D(630,1305),D(630,1305),D(630,1305),D(630,1305),D(630,1305)], hoursText:'毎日 10:30〜(通し営業)', pid:'ChIJN2bssEGLGGARd5L5p-AoIAs'},
+{id:'shodai', name:'初代 恵比寿本店', cat:'そば・うどん', lat:35.6464887, lng:139.7084060, price:2, g:4.1, gn:1401,
+ desc:'名物・白いポテトクリームのカレーうどん。SNSで有名、ピークは行列注意。',
+ hours:[D(690,1290),D(690,1290),D(690,1290),D(690,1290),D(690,1290),D(690,1290),D(690,1290)], hoursText:'毎日 11:30-21:30', pid:'ChIJiX4T-0CLGGARIdncuM0Y-2s'},
+{id:'sobaichi', name:'そば一 恵比寿店(駅構内)', cat:'そば・うどん', lat:35.6463977, lng:139.7102336, price:1, g:3.6, gn:692,
+ desc:'JR恵比寿駅東口改札内の駅そば。数百円・5分で完結する緊急用。',
+ hours:[D(420,1350),D(420,1350),D(420,1350),D(420,1350),D(420,1350),D(420,1260),D(540,1200)], hoursText:'毎日 7:00〜', pid:'ChIJSdVkP0CLGGARF4VRA1pLG4E'},
+{id:'spicechill', name:'Spice Chill', cat:'カレー', lat:35.6468818, lng:139.7124582, price:3, g:4.6, gn:45,
+ desc:'平日昼のみ営業のスパイスカレー。サラダバー付き。まさにオフィスワーカー向け。',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),null,null], hoursText:'平日のみ 11:30-15:00', pid:'ChIJUTBhBtaLGGARUNCKuj2qKOE'},
+{id:'bombay', name:'東京ボンベイ 恵比寿', cat:'カレー', lat:35.6433742, lng:139.7117143, price:2, g:4.4, gn:534,
+ desc:'カシミールカレーの名店。立ち食い6席の小さな店、提供は速い。',
+ hours:[D(660,1275),D(660,1275),D(660,1275),D(660,1275),D(660,1275),D(660,1275),D(660,1275)], hoursText:'毎日 11:00-21:15', pid:'ChIJMaULUJWLGGARhjOAjXFePJk'},
+{id:'colombo', name:'東京コロンボ', cat:'カレー', lat:35.6478566, lng:139.7111425, price:2, g:4.0, gn:131,
+ desc:'スポーツバーの昼間営業で出す欧風カレー。あいがけ推し。',
+ hours:[null,D(690,900),D(690,900),D(690,900),D(690,900),D(720,1020),D(720,1020)], hoursText:'火〜金 11:30-15:00/月休', pid:'ChIJLVkT_uaNGGARmL-7geqPhbM'},
+{id:'masa', name:"MASA'S KITCHEN 恵比寿", cat:'中華', lat:35.6466388, lng:139.7146238, price:3, g:4.1, gn:583,
+ desc:'上質な四川系モダン中華。ランチコースでちょっと贅沢に。',
+ hours:[null,D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'火〜日 11:30-15:00/月休', pid:'ChIJHxZ20xSLGGARqmVBZgY600A'},
+{id:'tsukushiro', name:'筑紫楼 恵比寿店', cat:'中華', lat:35.6457374, lng:139.7086157, price:3, g:4.3, gn:698,
+ desc:'名物ふかひれ麺のランチ約1,800円。ちょっといい日のランチに。',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,1260),D(690,1260)], hoursText:'毎日 11:30-14:30(平日)', pid:'ChIJC_vAmhOLGGARlWy8M3q6dDs'},
+{id:'maika', name:'舞華', cat:'中華', lat:35.6497272, lng:139.7077411, price:1, g:4.4, gn:588,
+ desc:'町中華の名店。人生最高レベルと評される炒飯と麻婆豆腐。',
+ hours:[D(660,1140),D(660,1140),D(660,1140),D(660,1140),D(660,1140),D(660,1140),null], hoursText:'月〜土 11:00-19:00/日休', pid:'ChIJpXeQwUOLGGARrYhxnsf6Epg'},
+{id:'sushiebisu', name:'鮨 恵比寿 本店', cat:'寿司・海鮮', lat:35.6459278, lng:139.7132172, price:3, g:3.9, gn:596,
+ desc:'にぎわい系寿司居酒屋のランチ握りセット。12:00開店なので後半組向け。',
+ hours:[D(720,840),D(720,840),D(720,840),D(720,840),D(720,840),D(720,1440),D(720,1380)], hoursText:'平日 12:00-14:00', pid:'ChIJZzm26yqLGGAR_pLbSa1I2nQ'},
+{id:'kodama', name:'小玉新太郎', cat:'寿司・海鮮', lat:35.6471941, lng:139.7116811, price:2, g:4.2, gn:96,
+ desc:'出汁と鮮魚の海鮮丼。〆に出汁をかけて二度おいしい。',
+ hours:[D(690,840),D(690,840),D(690,840),D(690,840),D(690,840),D(690,840),D(690,840)], hoursText:'毎日 11:30-14:00', pid:'ChIJwbBDVgCLGGAR4XioJmGqj00'},
+{id:'kaisen', name:'貝鮮市場', cat:'寿司・海鮮', lat:35.6479802, lng:139.7111824, price:2, g:4.2, gn:153,
+ desc:'貝専門の海鮮居酒屋の平日限定ランチ。刺身定食が狙い目。',
+ hours:[D(690,840),D(690,840),D(690,840),D(690,840),D(690,840),null,null], hoursText:'平日のみ 11:30-14:00', pid:'ChIJEV0U00GLGGARcxw3AAytlsA'},
+{id:'sushiko', name:'築地寿司好 恵比寿', cat:'寿司・海鮮', lat:35.6461620, lng:139.7085709, price:2, g:4.4, gn:120,
+ desc:'職人が握る本格寿司のお得なランチセット。落ち着いた雰囲気。',
+ hours:[null,D(690,840),D(690,840),D(690,840),D(690,840),D(690,1350),D(690,1320)], hoursText:'火〜金 11:30-14:00/月休', pid:'ChIJE9QvPVyLGGARpR8rZZb3Grs'},
+{id:'knock', name:'KNOCK CUCINA BUONA ITALIANA', cat:'イタリアン・洋食', lat:35.6447804, lng:139.7104238, price:2, g:4.3, gn:574,
+ desc:'行列のできるカジュアルイタリアン。わさびパスタなど変化球も。',
+ hours:[D(720,930),null,D(720,930),D(720,930),D(720,930),D(690,1380),D(690,1380)], hoursText:'12:00-15:30/火休', pid:'ChIJMxtd8j-LGGARpQVeOhMpQzk'},
+{id:'sakai', name:'とんかつ酒井', cat:'肉・揚げ物', lat:35.6451134, lng:139.7103845, price:3, g:5.0, gn:61,
+ desc:'Google5.0の新鋭とんかつ。しっとり火入れのロース・ヒレと丁寧な小鉢。',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),null], hoursText:'月〜土 11:30-14:30/日休', pid:'ChIJB-VMG1eLGGAR6in37oJXJbg'},
+{id:'katsusai', name:'えびすかつ彩 アトレ恵比寿店', cat:'肉・揚げ物', lat:35.6466714, lng:139.7102831, price:3, g:3.9, gn:297,
+ desc:'アトレ6Fのとんかつ。キャベツ・味噌汁・ごはんおかわり無料で安定感あり。',
+ hours:[D(660,1350),D(660,1350),D(660,1350),D(660,1350),D(660,1350),D(660,1350),D(660,1350)], hoursText:'毎日 11:00-22:30', pid:'ChIJzcHjRkCLGGAR5FpOcQaGsJk'},
+{id:'ebisushoten', name:'恵比寿商店(揚げ物食堂)', cat:'肉・揚げ物', lat:35.6481225, lng:139.7085891, price:2, g:3.7, gn:23,
+ desc:'デカ盛り唐揚げ定食が1,050円前後。QRセルフ注文で提供も速い。',
+ hours:[D(660,1260),D(660,1260),D(660,1260),D(660,1260),D(660,1260),D(660,1260),D(660,1260)], hoursText:'毎日 11:00-21:00', pid:'ChIJv41T8FSLGGARTcOyosQpGlE'},
+{id:'kimukatsu', name:'キムカツ 恵比寿本店', cat:'肉・揚げ物', lat:35.6459705, lng:139.7132108, price:3, g:3.8, gn:592,
+ desc:'25層ミルフィーユとんかつの本店。キャベツおかわり無料・釜ごはん。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:'ChIJb6zBMBWLGGAR7L6z3GxJV44'},
+{id:'kuroge', name:'黒毛七厘', cat:'肉・揚げ物', lat:35.6458723, lng:139.7154915, price:3, g:4.4, gn:91,
+ desc:'黒毛和牛100%の絶品ハンバーグランチ。木〜日の昼のみ営業に注意。',
+ hours:[null,null,null,D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'木〜日 11:30-15:00(月〜水は夜のみ)', pid:'ChIJsb7b_5uLGGAReVYJdx7jaYc'},
+{id:'beefgarden', name:'焼肉 BeefGarden 恵比寿', cat:'肉・揚げ物', lat:35.6453875, lng:139.7147221, price:3, g:4.1, gn:321,
+ desc:'一人焼肉もしやすい焼肉ランチセット。コスパ良好と評判。',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,900),D(690,900)], hoursText:'毎日 11:30-14:30', pid:'ChIJtUiS5RSLGGARUEfSjYDUgJ0'},
+{id:'hirokiya', name:'廣木屋', cat:'肉・揚げ物', lat:35.6483874, lng:139.7081452, price:3, g:4.8, gn:2173,
+ desc:'生ハンバーグとユッケの超人気店(Google4.8/2000件超)。開店12時、行列覚悟。',
+ hours:[D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900)], hoursText:'毎日 12:00-15:00', pid:'ChIJVy_krISLGGARQPa7gFKXErM'},
+{id:'akaushi', name:'あか牛Lab.(あか牛精肉販売所)', cat:'肉・揚げ物', lat:35.6485425, lng:139.7116822, price:3, g:4.2, gn:73,
+ desc:'精肉店直営のあか牛丼・ステーキ。タワーから徒歩2分。※ランチ営業日が不定期の場合あり。',
+ hours:[null,D(660,810),D(660,810),D(660,810),D(660,810),D(660,810),D(660,810)], hoursText:'火〜日 11:00-13:30頃/月休(不定期あり)', pid:'ChIJC8uwiymLGGARNunZweNBTJk'},
+{id:'yumyum', name:'タイ・イサーン料理 ヤムヤム', cat:'アジア・エスニック', lat:35.6471986, lng:139.7073823, price:2, g:4.4, gn:264,
+ desc:'本場イサーン料理。ガパオやカオマンガイのランチが手頃で本格的。',
+ hours:[D(660,840),D(660,840),D(660,840),D(660,840),D(660,840),D(660,900),D(660,900)], hoursText:'平日 11:00-14:00/土日〜15:00', pid:'ChIJhZFRiO-LGGAR7ehPbiwQvcQ'},
+{id:'piglady', name:'THE PIG & THE LADY', cat:'アジア・エスニック', lat:35.6463857, lng:139.7089083, price:3, g:4.1, gn:631,
+ desc:'ハワイ発モダンベトナミーズ。フォー+バインミーのおしゃれランチ。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,1380),D(660,1380)], hoursText:'毎日 11:00-15:00', pid:'ChIJhYsW_ASLGGAR-tZC31Vw0q8'},
+{id:'nhaviet', name:'ニャーヴェトナム 恵比寿本店', cat:'アジア・エスニック', lat:35.6448295, lng:139.710653, price:2, g:4.0, gn:622,
+ desc:'老舗ベトナム料理。フォー+ミニカレーなどハーフ&ハーフのランチセットが人気。',
+ hours:[D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(720,930),D(720,930)], hoursText:'毎日 11:30〜', pid:'ChIJ1bWqZkCLGGAR3ekIhCEdKPM'},
+{id:'manjyo', name:'マンジョッ 五香チョッパル ebisu', cat:'アジア・エスニック', lat:35.6479616, lng:139.7128781, price:2, g:4.3, gn:179,
+ desc:'韓国料理。石焼ビビンバランチ約1,000円でおかず付き。タワーから徒歩2分。',
+ hours:[D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930)], hoursText:'毎日 11:30-15:30', pid:'ChIJeZorbgCLGGAR8hGr3GdPKjM'},
+{id:'brisk', name:'BRISKSTAND EBISU', cat:'バーガー・サンド', lat:35.6455023, lng:139.7179653, price:3, g:4.7, gn:238,
+ desc:'バーガー日本一に輝いた神戸発の実力店。名物「切ったやつ」は断面まで香ばしい。',
+ hours:[D(660,1290),D(660,1290),D(660,1290),D(660,1290),D(660,1290),D(660,1290),D(660,1290)], hoursText:'毎日 11:00-21:30', pid:'ChIJW1lq3uKLGGARXoDje9kMNj8'},
+{id:'stabler', name:'Stabler Meatsand EBISU', cat:'バーガー・サンド', lat:35.6461673, lng:139.7082944, price:2, g:4.3, gn:236,
+ desc:'ステーキ&エッグサンドの専門店。テイクアウトしてデスクや公園ランチにも。',
+ hours:[D(660,1200),D(660,1200),D(660,1200),D(660,1200),D(660,1200),D(660,1200),D(660,1200)], hoursText:'毎日 11:00-20:00', pid:'ChIJYdnRjtmLGGARXZGrfL6DxdI'},
+{id:'burgermania', name:'Burger Mania 恵比寿', cat:'バーガー・サンド', lat:35.6459945, lng:139.7130708, price:3, g:4.2, gn:1051,
+ desc:'恵比寿のグルメバーガー定番。店舗限定チェリーバーガーなど変化球も。',
+ hours:[D(660,1320),D(660,1320),D(660,1320),D(660,1320),D(660,1320),D(660,1320),D(660,1320)], hoursText:'毎日 11:00-22:00', pid:'ChIJ0yIkNxWLGGARxAega2ivf2c'},
+{id:'tokiofrench', name:'TOKIO French 恵比寿', cat:'イタリアン・洋食', lat:35.6466191, lng:139.7163693, price:3, g:4.3, gn:40,
+ desc:'券売機セルフ式の気軽な本格フレンチ。サービス料なしで一皿が手頃。',
+ hours:[D(690,1290),D(690,1290),D(690,1290),D(690,1290),D(690,1290),D(690,1290),D(690,1260)], hoursText:'毎日 11:30-21:30', pid:'ChIJO-9nC-2LGGARBvo36-oVhCQ'},
+{id:'dami', name:"Bistro D'ami", cat:'イタリアン・洋食', lat:35.6479528, lng:139.7125586, price:3, g:4.5, gn:50,
+ desc:'タワー徒歩2分の本格ビストロ。ランチは水〜金のみの隠れ家。',
+ hours:[null,null,D(690,840),D(690,840),D(690,840),null,null], hoursText:'水〜金のみ 11:30-14:00', pid:'ChIJXdVHWAaLGGAR8T59xyAIN0A'},
+{id:'yamamotoya', name:'天ぷら串 山本家', cat:'定食・和食', lat:35.6446739, lng:139.7105085, price:2, g:4.6, gn:267,
+ desc:'揚げたて天ぷらのランチ定食・天丼。夜は居酒屋の実力店。',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(720,1380),D(720,1380)], hoursText:'平日 11:30-14:30', pid:'ChIJK6Db8sqLGGARQgA-HCpFwJM'},
+{id:'kouten', name:'長崎天ぷら 幸天 恵比寿', cat:'定食・和食', lat:35.6457321, lng:139.7074996, price:3, g:4.7, gn:268,
+ desc:'甘めの衣が特徴の長崎天ぷら専門店。揚げたてを目の前で。Google4.7。',
+ hours:[D(690,840),D(690,840),D(690,840),D(690,840),D(690,840),D(690,840),D(690,840)], hoursText:'毎日 11:30-14:00', pid:'ChIJZea8N9OLGGARJEBpL3dJDIs'},
+{id:'tenya', name:'天丼てんや 恵比寿店', cat:'定食・和食', lat:35.647829, lng:139.7103011, price:1, g:3.6, gn:402,
+ desc:'ワンコイン級で早い・安いの天丼チェーン。時間がない日の駆け込み先。',
+ hours:[D(660,1260),D(660,1260),D(660,1260),D(660,1260),D(660,1260),D(630,1260),D(630,1260)], hoursText:'毎日 11:00-21:00', pid:'ChIJP_AHtkGLGGARONMbX6-mryk'},
+{id:'tomason', name:'トマソン', cat:'定食・和食', lat:35.6484435, lng:139.7124568, price:1, g:3.9, gn:29,
+ desc:'ビルB1の隠れ家食堂。日替わり定食780〜850円は界隈最安級、+100円でミニカレー追加可。ごはんおかわり無料。',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),null,null], hoursText:'平日 11:30〜/土日休', pid:'ChIJfc4SNS6LGGARjwYY9E8GcUs'},
+{id:'matsugen', name:'松玄 恵比寿本店', cat:'そば・うどん', lat:35.6488565, lng:139.7120927, price:2, g:4.1, gn:628,
+ desc:'タワー徒歩2分のモダン蕎麦。せいろ+天ぷらで1,200〜1,600円。夜は蕎麦割烹。',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870)], hoursText:'毎日 11:30-14:30', pid:'ChIJKUYVcGqLGGARhUcGzAYXWIg'},
+{id:'nakayoshimeiji', name:'なかよし 明治通り店', cat:'定食・和食', lat:35.6503006, lng:139.7095861, price:2, g:3.9, gn:281,
+ desc:'土鍋ごはん定食「なかよし」の支店。本店より断然近く、焼魚定食が充実。ごはんおかわり無料。',
+ hours:[D(660,1290),D(660,1290),D(660,1290),D(660,1290),D(660,1290),D(660,900),D(660,900)], hoursText:'毎日 11:00〜', pid:'ChIJHRbzMEKLGGARyTMSqagbZLY'},
+{id:'maen', name:'MAEN', cat:'イタリアン・洋食', lat:35.6485369, lng:139.7110727, price:3, g:4.9, gn:105,
+ desc:'日本酒ペアリングで話題のモダンフレンチ(Google4.9)。ランチはコース中心、特別な日の贅沢枠。',
+ hours:[D(720,870),D(720,870),null,D(720,870),D(720,870),D(720,870),D(720,870)], hoursText:'12:00-14:30/水休', pid:'ChIJWzMTComLGGARmAJ1Ys2aLNg'},
+{id:'beaux', name:'Beaux(ボウ)', cat:'イタリアン・洋食', lat:35.6483628, lng:139.7175913, price:2, g:4.7, gn:18,
+ desc:'ふわとろオムライスランチ1,200円(サラダ・スープ付)。カウンター広めで一人でも快適。',
+ hours:[null,D(690,840),D(690,840),D(690,840),D(690,840),null,null], hoursText:'火〜金 11:30-14:00', pid:'ChIJW5oDtWyLGGARbxM34yW8aGA'},
+{id:'tsubaki', name:'椿食堂', cat:'定食・和食', lat:35.6497403, lng:139.7199911, price:2, g:3.8, gn:307,
+ desc:'和定食1,200円前後・ごはんおかわり無料。夜はおばんざい居酒屋。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00〜(通し営業)', pid:'ChIJZb68Om2LGGARTcCYYFY5zjo'},
+{id:'shuji', name:'しゅうじ食堂', cat:'定食・和食', lat:35.6487473, lng:139.7167695, price:2, g:3.8, gn:58,
+ desc:'アジフライ定食の専門店。サクふわ揚げたてに自家製タルタル。桜の季節は店前が絶景。',
+ hours:[null,D(690,870),D(660,870),D(690,870),D(690,870),D(690,870),D(690,870)], hoursText:'火〜日 11:30-14:30/月休', pid:'ChIJ0azBZ8aLGGARG9BQ5Fg_YWU'},
+{id:'meibutsuya', name:'名物屋', cat:'定食・和食', lat:35.6478512, lng:139.7089183, price:2, g:4.6, gn:465,
+ desc:'居酒屋の名物ランチ。値段から想像できない品数とボリュームで高評価(Google4.6)。開店は12時。',
+ hours:[D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900)], hoursText:'毎日 12:00〜', pid:'ChIJtyo7KQCLGGARXGjXc5v17uM'},
+{id:'yayoiken', name:'やよい軒 恵比寿1丁目店', cat:'定食・和食', lat:35.6474618, lng:139.7122563, price:1, g:2.9, gn:30,
+ desc:'ごはんおかわり自由の定食チェーン。朝7時から営業、時間がない日の保険枠。',
+ hours:[D(420,1380),D(420,1380),D(420,1380),D(420,1380),D(420,1380),D(420,1380),D(420,1380)], hoursText:'毎日 7:00-23:00', pid:'ChIJC04XGACLGGARKR4EmF4Rt5Q'},
+{id:'donku', name:'ドン・ク(長崎料理)', cat:'ラーメン・麺', lat:35.6479395, lng:139.7078787, price:1, g:4.0, gn:370,
+ desc:'長崎ちゃんぽん・皿うどんの老舗。ランチはごはん付き、チキンカツも人気。',
+ hours:[D(690,960),D(690,960),D(690,960),D(660,960),D(690,960),null,null], hoursText:'平日 11:30-16:00/土日休', pid:'ChIJ_eUba0GLGGARyjxAqXlL4WA'},
+{id:'barvalley', name:'BarValley(うどん定食)', cat:'そば・うどん', lat:35.6475451, lng:139.7118407, price:2, g:3.5, gn:133,
+ desc:'オーガニック素材の自家製うどん・出汁の定食。平日昼のみの隠れ家。',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),null,null], hoursText:'平日のみ 11:30-15:00', pid:'ChIJ0zLZ0EeLGGARsljDlw1SCqI'},
+{id:'tensai', name:'和チーズ料理専門店 TENSAI', cat:'イタリアン・洋食', lat:35.6470126, lng:139.7111952, price:2, g:3.9, gn:134,
+ desc:'とろとろチーズオムライスの専門店。ランチはスープ・サラダ・ドリンク付き。',
+ hours:[null,null,D(690,900),D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'水〜日 11:30-15:00/月火休', pid:'ChIJdZZfYDKMGGARD3fZReGt-WM'},
+{id:'ethnicasian', name:'エスニックアジアンダイニング 恵比寿', cat:'カレー', lat:35.6472581, lng:139.7143075, price:2, g:3.9, gn:79,
+ desc:'インドカレーとチーズガーリックナン。ベジメニューも充実の街のカレー屋。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),null], hoursText:'月〜土 11:00〜/日休', pid:'ChIJobs-KGuLGGARCYG2Lg9M38Y'},
+{id:'lelion', name:'Le Lion(ル・リオン)', cat:'イタリアン・洋食', lat:35.6465641, lng:139.7139314, price:3, g:4.2, gn:272,
+ desc:'パリの街角そのままの内装のビストロ。気分を変えたい日のランチに。',
+ hours:[null,D(690,840),D(690,840),D(690,840),D(690,840),D(720,840),null], hoursText:'火〜土 11:30-14:00/月日休', pid:'ChIJWdkhKxWLGGARSWOB7nb43tg'},
+{id:'minato', name:'みなと食堂', cat:'寿司・海鮮', lat:35.647784, lng:139.7097998, price:2, g:3.5, gn:300,
+ desc:'券売機式の海鮮丼ファストフード。バラエティ丼1,300円・提供5分の速さ。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00〜(通し営業)', pid:'ChIJlU5bsEGLGGARgyAO29pPdoE'},
+{id:'vivace', name:'Trattoria Vivace 恵比寿', cat:'イタリアン・洋食', lat:35.6463484, lng:139.7118421, price:2, g:3.7, gn:558,
+ desc:'GEMS2Fの大箱トラットリア。大盛りパスタ+自家製パンのランチ。',
+ hours:[D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900)], hoursText:'毎日 12:00-15:00', pid:'ChIJN6reqGqLGGARIasw9fuKvd4'},
+{id:'yooya', name:'95YOOYA(雲南・ミャンマー料理)', cat:'アジア・エスニック', lat:35.645046, lng:139.7147733, price:2, g:4.7, gn:380,
+ desc:'バタフライピーの青いご飯とビーフカレーが名物(Google4.7)。ハラール・ビーガン対応。',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(720,900),D(720,900)], hoursText:'毎日 11:30-15:00', pid:'ChIJZUlJikyLGGARVEv0fxY7P7Y'},
+{id:'raorao', name:'タイ屋台 ラオラオ', cat:'アジア・エスニック', lat:35.6454772, lng:139.7114365, price:2, g:3.9, gn:349,
+ desc:'タイ人スタッフの屋台系タイ料理。ガパオ・ソムタムが本場仕様。',
+ hours:[D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930)], hoursText:'毎日 11:30〜(通し営業)', pid:'ChIJQY1e_j-LGGARLKoQ9rx_ARw'},
+{id:'tomoeya', name:'巴屋', cat:'そば・うどん', lat:35.6488712, lng:139.7175110, price:1, g:3.8, gn:169,
+ desc:'明治通り沿いの老舗町蕎麦。なめこそば950円・鍋焼きうどんも人気。現金のみ。',
+ hours:[D(660,1200),D(660,1200),D(660,1200),D(660,1200),D(660,1200),null,null], hoursText:'平日 11:00-20:00/土日休', pid:'ChIJcWqEu2yLGGARQ6tXj82dtyI'},
+{id:'kogane', name:'こがね製麺所 恵比寿店', cat:'そば・うどん', lat:35.645655, lng:139.715138, price:1, g:3.6, gn:172,
+ desc:'製麺所直営の讃岐うどん。牛すじカレーうどんが看板。セルフ式で速い。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),null], hoursText:'月〜土 11:00-15:00/日休', pid:'ChIJnZsX8UeLGGARiBYNi2hcoG0'},
+{id:'okinawalover', name:'大衆バル 沖縄LOVER', cat:'定食・和食', lat:35.6498581, lng:139.7120841, price:2, g:4.6, gn:200,
+ desc:'タワーと同じ並び・PASEO恵比寿1Fの沖縄料理。ソーキそば・タコライスのランチ。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),null], hoursText:'月〜土 11:00-15:00/日は夜のみ', pid:'ChIJN9PvqmOLGGARFn1CKcvyTkY'},
+{id:'tokitarazu', name:'トキタラズ 恵比寿', cat:'定食・和食', lat:35.6485553, lng:139.7137365, price:3, g:4.2, gn:242,
+ desc:'鮮魚と和食の御膳ランチ(ハラール・ベジ対応)。落ち着いた店内でゆっくり派向け。',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),null], hoursText:'月〜土 11:30-15:00/日休', pid:'ChIJU_GMx2yLGGARUhqC9E86_7Q'},
+{id:'sunnycafe', name:'Sunny Cafe(カリブ料理)', cat:'アジア・エスニック', lat:35.6484373, lng:139.7145959, price:2, g:4.4, gn:85,
+ desc:'都内では貴重なカリブ料理。スモーキーなジャークチキンプレート。ビーガンプレートあり。',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),null], hoursText:'月〜土 11:30-14:30/日休', pid:'ChIJC03sFgCLGGARoc-9fRMV_sM'},
+{id:'logercafe', name:'Loger Cafe', cat:'カフェ・軽食', lat:35.6481308, lng:139.7109026, price:2, g:3.7, gn:536,
+ desc:'ソファ席のあるカフェビストロ。サラダ・ドリンク付きランチセット。名物ブラウニーも。',
+ hours:[D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900)], hoursText:'毎日 12:00〜', pid:'ChIJlQMQz0GLGGAR4pD32DnPYmY'},
+{id:'ebisushokudo', name:'恵比寿食堂(中華)', cat:'中華', lat:35.6485674, lng:139.7154993, price:2, g:3.6, gn:112,
+ desc:'青椒肉絲・回鍋肉などの中華定食が1,000円強でボリューム満点。オフィスワーカー御用達。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),null], hoursText:'月〜土 11:00-15:00/日休', pid:'ChIJ2UNTamuLGGAREE5GXV_IFz8'},
+{id:'kosocafe', name:'KO-SO CAFE', cat:'カフェ・軽食', lat:35.648607, lng:139.7097654, price:2, g:4.4, gn:340,
+ desc:'ヴィーガン・グルテンフリー対応カフェ。大豆ミートプレートやパスタ約1,300円。',
+ hours:[D(660,900),D(660,900),null,D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'11:00〜/水休', pid:'ChIJAQBwlkGLGGARSXclXVaKwzs'},
+{id:'dodonpa', name:'ドドンパ弁当 本店', cat:'弁当・テイクアウト', lat:35.6480215, lng:139.7153124, price:1, g:4.5, gn:53,
+ desc:'ほぼ全品500円台の行列弁当スタンド。のり弁の唐揚げが絶品。デスクランチ・公園ランチに。',
+ hours:[D(570,1020),D(570,1020),D(570,1020),D(570,1020),D(570,1020),null,null], hoursText:'平日 9:30-17:00/土日休', pid:'ChIJM2vpOGuLGGARdG64iD6S2LA'},
+{id:'mercatino', name:'Mercatino Hiroo(イタリアン惣菜)', cat:'弁当・テイクアウト', lat:35.6482321, lng:139.7152383, price:2, g:3.7, gn:65,
+ desc:'イタリアン惣菜デリ。本格ラザニアやデリプレートをテイクアウトできる変化球。',
+ hours:[D(660,1200),D(660,1200),D(660,1200),D(660,1200),D(660,1200),D(660,1200),D(660,1200)], hoursText:'毎日 11:00-20:00', pid:'ChIJs5OcpQyLGGARUqE6ujLaJIo'},
+{id:'megutama', name:'写真集食堂 めぐたま', cat:'定食・和食', lat:35.651898, lng:139.712958, price:2, g:4.5, gn:249,
+ desc:'写真集5,000冊に囲まれて食べる丁寧な家庭料理の定食。タワー徒歩3分の隠れた名所。',
+ hours:[null,D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900)], hoursText:'火〜日 12:00〜/月休', pid:'ChIJLzX9lGmLGGARYgMVPHNjYEQ'},
+{id:'shimada', name:'麺庭 しま田', cat:'ラーメン・麺', lat:35.6479627, lng:139.7101676, price:2, g:3.8, gn:670,
+ desc:'淡麗醤油ラーメンの実力店。細麺パツパツ系、味玉ラーメン約1,000円。',
+ hours:[D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),D(660,930)], hoursText:'毎日 11:00〜(深夜まで)', pid:'ChIJVWnMOnGLGGAR0oDiiiMubr0'},
+{id:'uotake', name:'魚竹', cat:'寿司・海鮮', lat:35.651359, lng:139.7087932, price:2, g:4.1, gn:343,
+ desc:'刺身定食のコスパ最強クラスと評判の魚料理店。明治通り沿い、徒歩6分。',
+ hours:[D(705,840),D(705,840),D(705,840),D(705,840),D(705,840),D(705,840),null], hoursText:'月〜土 11:45-14:00/日昼休', pid:'ChIJoUhXqkOLGGARuad_1m_PpxU'},
+{id:'goodluck', name:'Good Luck Curry', cat:'カレー', lat:35.6510462, lng:139.7084794, price:2, g:4.3, gn:299,
+ desc:'日替わり2種のスパイスカレー(昼のみ営業)。あいがけ+チーズが人気。ビーガン対応日あり。',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'毎日 11:30-15:00(昼のみ)', pid:'ChIJRXvTsUOLGGARh7DpRgGlRK0'},
+{id:'grillmash', name:'グリルマッシュ', cat:'肉・揚げ物', lat:35.6470981, lng:139.7147472, price:2, g:3.9, gn:396,
+ desc:'鉄板ハンバーグ約1,000円+名物ベイクドマッシュポテト200円の組み合わせが鉄板。',
+ hours:[D(690,900),D(690,900),null,D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'11:30-15:00/水休', pid:'ChIJqwtZLWuLGGAR-zdGq3Y11F4'},
+{id:'konishi', name:'洋食 小西', cat:'イタリアン・洋食', lat:35.6486802, lng:139.7163915, price:2, g:4.1, gn:227,
+ desc:'昭和レトロな夫婦経営の老舗洋食。ハンバーグ・カツのランチはコーンスープ付き。',
+ hours:[D(660,870),D(660,870),D(660,870),D(660,870),D(660,870),D(660,870),null], hoursText:'月〜土 11:00-14:30/日休', pid:'ChIJle7rXWuLGGARPm_rKU8TffE'},
+{id:'kenary', name:'Korean Bistro KENARY', cat:'アジア・エスニック', lat:35.6469352, lng:139.7127783, price:3, g:4.6, gn:190,
+ desc:'洗練された韓国ビストロ。骨からほろほろの参鶏湯セットはドリンク・小鉢付き。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(720,900),D(720,900)], hoursText:'平日 11:00-15:00', pid:'ChIJg51iLACLGGARXMzvAECcO5c'},
+{id:'tsubame', name:'つばめグリル アトレ恵比寿店', cat:'肉・揚げ物', lat:35.6468566, lng:139.7100103, price:2, g:4.0, gn:457,
+ desc:'アルミホイル包みのつばめ風ハンブルグステーキ。安定の老舗チェーン。',
+ hours:[D(660,1350),D(660,1350),D(660,1350),D(660,1350),D(660,1350),D(660,1350),D(660,1350)], hoursText:'毎日 11:00-22:30(アトレ6F)', pid:'ChIJSdVkP0CLGGARx87Iwihv3-c'},
+{id:'kiwame', name:'新宿食肉センター 極 恵比寿店', cat:'肉・揚げ物', lat:35.6463576, lng:139.7114659, price:2, g:4.1, gn:402,
+ desc:'鮮度自慢のホルモン・焼肉ランチ定食。ライスおかわり無料のガッツリ系。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00〜(通し営業)', pid:'ChIJWdAZz12LGGARNXm2K6DMuqE'},
+{id:'sushibun', name:'寿司文', cat:'寿司・海鮮', lat:35.647585, lng:139.708964, price:2, g:4.2, gn:194,
+ desc:'駅西の老舗町寿司。良心価格のにぎりランチ。13:45ラストオーダーに注意。',
+ hours:[D(690,825),D(690,825),D(690,825),D(690,825),D(690,825),null,null], hoursText:'平日 11:30-13:45/土日休', pid:'ChIJ5YBECEGLGGARIgV0HexggAA'},
+{id:'shuuichi', name:'しゅういち(カレーラーメン)', cat:'ラーメン・麺', lat:35.6472153, lng:139.7083209, price:2, g:3.9, gn:593,
+ desc:'黒胡麻カレー担々麺が名物の個性派ラーメン。クセになる辛さと香り。',
+ hours:[D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),null], hoursText:'月〜土 11:00〜/日休', pid:'ChIJ9fvoGkGLGGARnp7XiiAMJ2w'},
+{id:'mitamen', name:'三田製麺所 恵比寿店', cat:'ラーメン・麺', lat:35.6465742, lng:139.7084679, price:2, g:3.4, gn:119,
+ desc:'極太つけ麺チェーン。QRセルフ注文で回転が速く、並・中・大が同価格。',
+ hours:[D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),D(660,930)], hoursText:'毎日 11:00〜(通し営業)', pid:'ChIJdc8BCQCLGGARh8un9pFtmPk'},
+{id:'hogane', name:'鰻と九州のつまみ ほがね', cat:'定食・和食', lat:35.6459999, lng:139.7130164, price:3, g:4.7, gn:163,
+ desc:'タレ控えめ上品なうな重ランチ(Google4.7)。肝吸い付き、たまの贅沢に。',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870)], hoursText:'毎日 11:30-14:30', pid:'ChIJZyPmDraLGGAR1JWhBG1-hDo'},
+{id:'monami', name:'モナミ食堂', cat:'アジア・エスニック', lat:35.6459539, lng:139.7134177, price:2, g:4.2, gn:469,
+ desc:'駅裏の韓国食堂。トッピングバー自由の自作ラーメンランチが楽しい。',
+ hours:[D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930)], hoursText:'毎日 11:30-15:30', pid:'ChIJbaaO_TqLGGAR1m0xcrSS3bw'},
+{id:'sonamu', name:'韓国家庭料理 ソナム', cat:'アジア・エスニック', lat:35.6470369, lng:139.7162059, price:2, g:3.7, gn:462,
+ desc:'900円前後のビビンバ・スンドゥブ。ごはん増量無料、座敷席あり。',
+ hours:[D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930)], hoursText:'毎日 11:30〜', pid:'ChIJQQ_hrxSLGGAR4BvL0nRRZZk'},
+{id:'monsoon', name:'モンスーンカフェ 恵比寿', cat:'アジア・エスニック', lat:35.6454139, lng:139.7117928, price:2, g:4.1, gn:602,
+ desc:'アジア各国料理のカフェレストラン。ガパオ・フォー・パッタイを一店で。',
+ hours:[D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930)], hoursText:'毎日 11:30〜', pid:'ChIJF-QeVxWLGGARXnvYn9xZga4'},
+{id:'chamorro', name:'チャモロ', cat:'イタリアン・洋食', lat:35.6460168, lng:139.7077033, price:2, g:4.1, gn:403,
+ desc:'昼のみ営業の老舗洋食。名物・厚切り牛タンオムライスは数量限定、開店直後が狙い目。',
+ hours:[null,D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870)], hoursText:'火〜日 11:30-14:30/月休(昼のみ)', pid:'ChIJCe193UCLGGARh4y1fTz1Cp0'},
+{id:'dalmatto', name:'Dal Matto 恵比寿', cat:'イタリアン・洋食', lat:35.6503943, lng:139.7069655, price:2, g:4.4, gn:255,
+ desc:'夜はコースで人気の本格イタリアン。昼は手頃なパスタランチ。',
+ hours:[null,D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'火〜日 11:30〜/月休', pid:'ChIJx9g4hUOLGGARNWCKcODsBk8'},
+{id:'comodo', name:'Baru Comodo', cat:'イタリアン・洋食', lat:35.6477195, lng:139.7075606, price:2, g:4.1, gn:163,
+ desc:'自家製生パスタ+生ハム+サラダで約1,300円の実力バル。二人で切り盛りする丁寧さ。',
+ hours:[D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),null,null], hoursText:'平日 11:30-15:30', pid:'ChIJLdGtQUGLGGARGMGJVOxLhGA'},
+{id:'unatetsu', name:'うな鉄 恵比寿本店', cat:'定食・和食', lat:35.6461323, lng:139.708856, price:4, g:4.2, gn:541,
+ desc:'ひつまぶし・蒲焼の有名店。通し営業なので時間をずらしてゆっくり贅沢ランチ。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00〜(通し営業)', pid:'ChIJufFx9kCLGGARtqKLwDFgygE'},
+];
+
+/* ================= 距離・営業時間ユーティリティ ================= */
+function haversine(a,b){
+  const R=6371000, toR=x=>x*Math.PI/180;
+  const dLat=toR(b.lat-a.lat), dLng=toR(b.lng-a.lng);
+  const h=Math.sin(dLat/2)**2 + Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+SHOPS.forEach(s=>{
+  s.dist = haversine(ORIGIN, s);
+  s.walk = Math.max(1, Math.round(s.dist*1.3/80)); // 経路係数1.3 / 分速80m
+  s.stay = 60 - s.walk*2;
+});
+const TOTAL = SHOPS.length;
+
+function todayIdx(){ const d=new Date().getDay(); return d===0?6:d-1; } // 月=0…日=6
+function nowMin(){ const d=new Date(); return d.getHours()*60+d.getMinutes(); }
+function openState(s){
+  const w = s.hours[todayIdx()];
+  if(!w) return {code:'closed', label:'本日休み'};
+  const n = nowMin();
+  if(n>=w[0] && n<w[1]) return {code:'now', label:'営業中'};
+  if(n<w[0]) return {code:'later', label:`${fmt(w[0])}開店`};
+  return {code:'done', label:'本日終了'};
+}
+const fmt = m=>`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
+
+/* ================= マイ記録(この端末に保存) ================= */
+let REVIEWS = {};
+let persistMode = 'none'; // claude | local | memory
+const RKEY = 'lunchmap-reviews-v1';
+
+async function loadReviews(){
+  // Claude上で開いた場合は個人ストレージ
+  try{
+    if(window.storage){
+      try{
+        const r = await window.storage.get(RKEY, false);
+        REVIEWS = r && r.value ? JSON.parse(r.value) : {};
+      }catch(e){ REVIEWS = {}; }
+      persistMode = 'claude'; return;
+    }
+  }catch(e){}
+  // 通常のブラウザではlocalStorageに自動保存
+  try{
+    const t = localStorage.getItem(RKEY);
+    REVIEWS = t ? JSON.parse(t) : {};
+    localStorage.setItem(RKEY, JSON.stringify(REVIEWS)); // 書き込み可否の確認
+    persistMode = 'local'; return;
+  }catch(e){}
+  persistMode = 'memory';
+  const bn = document.getElementById('storageBanner');
+  bn.style.display = 'block';
+  bn.textContent = '⚠ この環境では記録を保存できないため、画面を閉じるとメモが消えます。';
+}
+
+async function persist(){
+  try{
+    if(persistMode === 'claude'){ await window.storage.set(RKEY, JSON.stringify(REVIEWS), false); return true; }
+    if(persistMode === 'local'){ localStorage.setItem(RKEY, JSON.stringify(REVIEWS)); return true; }
+    return false;
+  }catch(e){ return false; }
+}
+
+async function saveReview(shopId, rev){
+  (REVIEWS[shopId] = REVIEWS[shopId]||[]).push(rev);
+  return (await persist()) ? 'saved' : 'local';
+}
+
+function teamAvg(id){
+  const r = REVIEWS[id]||[];
+  if(!r.length) return null;
+  return {avg:(r.reduce((a,b)=>a+b.s,0)/r.length), n:r.length};
+}
+// 実際に払った金額の中央値
+function paidStats(id){
+  const rows = (REVIEWS[id]||[])
+    .filter(r=>typeof r.y==='number' && r.y>0)
+    .map(r=>({y:r.y, t:Number(r.t)||0}));
+  if(!rows.length) return null;
+  const ys = rows.map(r=>r.y).sort((a,b)=>a-b);
+  const mid = Math.floor(ys.length/2);
+  const med = ys.length%2 ? ys[mid] : Math.round((ys[mid-1]+ys[mid])/2);
+  const latest = rows.reduce((a,b)=>b.t>a.t?b:a, rows[0]);
+  return {med, n:ys.length, min:ys[0], max:ys[ys.length-1], latest:latest.t};
+}
+
+function priceDetailHtml(s, ps){
+  if(!ps){
+    return `<div class="price-detail">
+      <div class="price-detail-head">
+        <span class="price-detail-title">ランチ価格の詳細</span>
+        <span class="price-detail-main">未登録</span>
+      </div>
+      <div class="price-detail-meta">
+        <div>掲載時の目安<b>${PRICES[s.price]}</b></div>
+        <div>支払記録<b>0件</b></div>
+      </div>
+      <div class="price-detail-note">支払った金額を記録すると、代表額・価格幅・最終記録日を表示します。価格は外部サイトから自動取得・定期更新しません。</div>
+    </div>`;
+  }
+  const range = ps.min===ps.max
+    ? `¥${ps.min.toLocaleString()}`
+    : `¥${ps.min.toLocaleString()}〜¥${ps.max.toLocaleString()}`;
+  const latest = ps.latest ? new Date(ps.latest).toLocaleDateString('ja-JP') : '日付なし';
+  return `<div class="price-detail">
+    <div class="price-detail-head">
+      <span class="price-detail-title">ランチ価格の詳細</span>
+      <span class="price-detail-main">代表 ¥${ps.med.toLocaleString()}</span>
+    </div>
+    <div class="price-detail-meta">
+      <div>算出方法<b>支払記録の中央値</b></div>
+      <div>記録件数<b>${ps.n}件</b></div>
+      <div>記録した価格幅<b>${range}</b></div>
+      <div>最終記録日<b>${latest}</b></div>
+      <div>掲載時の目安<b>${PRICES[s.price]}</b></div>
+    </div>
+    <div class="price-detail-note">この端末で入力した支払額のみを集計しています。外部サイトからの自動取得・定期更新は行いません。</div>
+  </div>`;
+}
+
+/* バックアップ(機種変更・ブラウザ移行用) */
+function mergeReviews(a, b){
+  const out = {}, seen = new Set();
+  [a, b].forEach(src=>Object.entries(src||{}).forEach(([id, arr])=>{
+    (arr||[]).forEach(r=>{
+      if(!r || typeof r.s !== 'number') return;
+      const k = id+'|'+r.t+'|'+r.s;
+      if(seen.has(k)) return; seen.add(k);
+      (out[id] = out[id]||[]).push(r);
+    });
+  }));
+  Object.values(out).forEach(arr=>arr.sort((x,y)=>x.t-y.t));
+  return out;
+}
+function exportReviews(){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(REVIEWS)], {type:'application/json'}));
+  a.download = 'lunchmap-backup.json'; a.click();
+}
+function importReviews(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = async()=>{
+    try{
+      REVIEWS = mergeReviews(REVIEWS, JSON.parse(await inp.files[0].text()));
+      await persist(); render(); alert('記録を取り込みました');
+    }catch(e){ alert('ファイルを読み込めませんでした'); }
+  };
+  inp.click();
+}
+
+/* ================= フィルタ状態 ================= */
+const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, sort:'dist', selected:null};
+
+function buildChips(){
+  const cc = document.getElementById('catChips');
+  Object.entries(CATS).forEach(([cat,color])=>{
+    const b=document.createElement('button');
+    b.className='chip'; b.innerHTML=`<span class="dot" style="background:${color}"></span>${cat}`;
+    b.onclick=()=>{ state.cats.has(cat)?state.cats.delete(cat):state.cats.add(cat); b.classList.toggle('on'); render(); };
+    cc.appendChild(b);
+  });
+  const pc = document.getElementById('priceChips');
+  Object.entries(PRICES).forEach(([p,label])=>{
+    const b=document.createElement('button');
+    b.className='chip'; b.textContent=label;
+    b.onclick=()=>{ const k=+p; state.prices.has(k)?state.prices.delete(k):state.prices.add(k); b.classList.toggle('on'); render(); };
+    pc.appendChild(b);
+  });
+  // 距離(徒歩時間)チップ:単一選択、再クリックで解除
+  const wc = document.getElementById('walkChips');
+  [[3,'徒歩3分以内'],[5,'徒歩5分以内'],[7,'徒歩7分以内'],[10,'徒歩10分以内']].forEach(([min,label])=>{
+    const b=document.createElement('button');
+    b.className='chip'; b.textContent=label; b.dataset.min=min;
+    b.onclick=()=>{
+      state.maxWalk = (state.maxWalk===min) ? null : min;
+      wc.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on', +x.dataset.min===state.maxWalk));
+      render();
+    };
+    wc.appendChild(b);
+  });
+  document.getElementById('openToggle').onchange=e=>{ state.openOnly=e.target.checked; render(); };
+  document.getElementById('sortSel').onchange=e=>{ state.sort=e.target.value; render(); };
+}
+
+function filtered(){
+  let list = SHOPS.filter(s=>{
+    if(state.cats.size && !state.cats.has(s.cat)) return false;
+    if(state.prices.size && !state.prices.has(s.price)) return false;
+    if(state.maxWalk && s.walk > state.maxWalk) return false;
+    if(state.openOnly && openState(s).code==='closed') return false;
+    return true;
+  });
+  const key = state.sort;
+  list.sort((a,b)=>{
+    if(key==='dist') return a.dist-b.dist;
+    if(key==='g') return b.g-a.g;
+    if(key==='stay') return b.stay-a.stay;
+    if(key==='team'){
+      const ta=teamAvg(a.id), tb=teamAvg(b.id);
+      return (tb?tb.avg:-1)-(ta?ta.avg:-1) || a.dist-b.dist;
+    }
+    return 0;
+  });
+  return list;
+}
+
+/* ================= マップ(Leaflet + OpenStreetMap) ================= */
+let LMAP = null, MARKERS = {}, ringLayer = null;
+
+function initMap(){
+  const box = document.getElementById('lmap');
+  if(typeof L === 'undefined'){
+    box.innerHTML = '<div class="mapfallback">地図ライブラリを読み込めませんでした。ネットワーク環境をご確認ください。<br>リストからは引き続き店舗を選べます。</div>';
+    return;
+  }
+  LMAP = L.map('lmap', {scrollWheelZoom:true}).setView([ORIGIN.lat, ORIGIN.lng], 16);
+  // 淡色シンプルスタイル(建物などの描画を最小限に、駅名・主要道路名は表示)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  }).addTo(LMAP);
+
+  // 徒歩時間リング(片道)半径 = 分×80m÷経路係数1.3
+  ringLayer = L.layerGroup();
+  [[3,'徒歩3分'],[6,'徒歩6分'],[9,'徒歩9分']].forEach(([min,label])=>{
+    const r = min*80/1.3;
+    L.circle([ORIGIN.lat, ORIGIN.lng], {radius:r, color:'#7C8A93', weight:1.2,
+      dashArray:'4 6', fill:false, interactive:false}).addTo(ringLayer);
+    L.marker([ORIGIN.lat + r/110540, ORIGIN.lng], {interactive:false,
+      icon: L.divIcon({className:'', html:`<div class="ring-label">${label}</div>`, iconSize:[54,18], iconAnchor:[27,9]})
+    }).addTo(ringLayer);
+  });
+  ringLayer.addTo(LMAP);
+
+  // 起点:プライムスクエアタワー
+  L.marker([ORIGIN.lat, ORIGIN.lng], {
+    icon: L.divIcon({className:'tower-icon', html:'P', iconSize:[30,30], iconAnchor:[15,15]}),
+    zIndexOffset: 1000
+  }).addTo(LMAP).bindTooltip('恵比寿プライムスクエアタワー(起点)', {direction:'top', offset:[0,-14], className:'shop-tip'});
+
+  // 店舗マーカー
+  SHOPS.forEach(s=>{
+    const m = L.circleMarker([s.lat, s.lng], {
+      radius:8, fillColor:CATS[s.cat], fillOpacity:.95, color:'#fff', weight:2
+    }).addTo(LMAP);
+    m.bindTooltip(`${s.name}(徒歩${s.walk}分)`, {direction:'top', offset:[0,-6], className:'shop-tip'});
+    m.on('click', ()=>openModal(s.id));
+    MARKERS[s.id] = m;
+  });
+
+  // リング表示トグル(凡例内)
+  const legend = document.getElementById('legend');
+  legend.innerHTML = Object.entries(CATS).map(([c,col])=>`<span><i style="background:${col}"></i>${c}</span>`).join('')
+    + `<label class="switch"><input type="checkbox" id="ringToggle" checked>徒歩圏リング</label>`;
+  document.getElementById('ringToggle').onchange = e=>{
+    e.target.checked ? ringLayer.addTo(LMAP) : LMAP.removeLayer(ringLayer);
+  };
+}
+
+function drawMap(list){
+  if(!LMAP) return;
+  const vis = new Set(list.map(s=>s.id));
+  SHOPS.forEach(s=>{
+    const m = MARKERS[s.id];
+    if(!m) return;
+    const on = vis.has(s.id);
+    const sel = state.selected === s.id;
+    m.setStyle({
+      radius: sel ? 12 : 8,
+      fillOpacity: on ? .95 : .15,
+      opacity: on ? 1 : .15,
+      weight: sel ? 3 : 2,
+      color: sel ? '#17242D' : '#fff'
+    });
+    if(sel) m.bringToFront();
+  });
+}
+
+/* ================= リスト ================= */
+function starStr(v){ const f=Math.round(v); return '★'.repeat(f)+'☆'.repeat(5-f); }
+function renderCards(list){
+  const box = document.getElementById('cards');
+  document.getElementById('emptyMsg').style.display = list.length?'none':'block';
+  box.innerHTML = list.map(s=>{
+    const st = openState(s);
+    const badgeCls = st.code==='now'?'open-now':(st.code==='closed'||st.code==='done')?'closed-day':'open-later';
+    const ta = teamAvg(s.id);
+    const stayCls = s.stay>=40?'stay-ok':'stay-tight';
+    const ph = (REVIEWS[s.id]||[]).map(r=>r.p).filter(p=>p&&String(p).indexOf('data:image')===0).pop();
+    const ps = paidStats(s.id);
+    return `<div class="card${st.code==='closed'?' closedToday':''}${ph?' hasThumb':''}" data-id="${s.id}" style="border-left-color:${CATS[s.cat]}">
+      ${ph?`<img class="c-thumb" src="${ph}" alt="">`:''}
+      <div class="c-top">
+        <span class="c-name">${s.name}</span>
+        <span class="badge" style="background:${CATS[s.cat]}">${s.cat}</span>
+        <span class="pricetag">${ps?`実績 ¥${ps.med.toLocaleString()}<span style="font-weight:400">(${ps.n}件)</span>`:PRICES[s.price]}</span>
+        <span class="openbadge ${badgeCls}">${st.label}</span>
+      </div>
+      <div class="c-desc">${s.desc}</div>
+      <div class="c-meta">
+        <span class="meta-item">🚶 徒歩 <b>${s.walk}分</b></span>
+        <span class="meta-item ${stayCls}">⏱ 滞在可能 約<b>${s.stay}分</b></span>
+        <span class="gstar">G ${s.g.toFixed(1)}</span>
+        <span class="teamstar">${ta?`自分 ${starStr(ta.avg)} ${ta.avg.toFixed(1)}(${ta.n}回)`:'メモなし'}</span>
+      </div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.card').forEach(el=>{
+    el.addEventListener('click',()=>openModal(el.dataset.id));
+    el.addEventListener('mouseenter',()=>{ state.selected=el.dataset.id; drawMap(filtered()); });
+  });
+}
+
+function render(){
+  const list = filtered();
+  document.getElementById('countNum').textContent = list.length;
+  renderCards(list);
+  drawMap(list);
+}
+
+/* ================= モーダル ================= */
+let pickStars = 0;
+function openModal(id){
+  state.selected = id;
+  const s = SHOPS.find(x=>x.id===id);
+  const st = openState(s);
+  const ta = teamAvg(id);
+  const revs = (REVIEWS[id]||[]).slice().reverse();
+  const gm = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name+' 恵比寿')}&query_place_id=${s.pid}`;
+  const gi = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(s.name+' 恵比寿 ランチ メニュー')}`;
+  const ps = paidStats(id);
+  pickStars = 0;
+  document.getElementById('modal').innerHTML = `
+    <button class="m-close" onclick="closeModal()">✕</button>
+    <span class="badge" style="background:${CATS[s.cat]}">${s.cat}</span>
+    <div class="m-name">${s.name}</div>
+    <div class="m-sub">${s.desc}</div>
+    <div class="photostrip" id="photoStrip"></div>
+    ${priceDetailHtml(s, ps)}
+    <div class="m-grid">
+      <div class="m-cell">徒歩(片道)<b>${s.walk}分/約${Math.round(s.dist)}m</b></div>
+      <div class="m-cell">昼休み60分での滞在目安<b>約${s.stay}分</b></div>
+      <div class="m-cell">営業時間<b style="font-size:12.5px">${s.hoursText}</b></div>
+      <div class="m-cell">現在<b>${st.label}</b></div>
+      <div class="m-cell">Google評価<b>★${s.g.toFixed(1)}(${s.gn}件)</b></div>
+    </div>
+    <a class="m-link" href="${gm}" target="_blank" rel="noopener">Google Mapsで経路・店の写真を見る →</a><br>
+    <a class="m-link" href="${gi}" target="_blank" rel="noopener">メニュー・料理の画像を検索 →</a>
+    <div class="m-h">自分の記録 ${ta?`平均 ${ta.avg.toFixed(1)}(${ta.n}件)`:'(まだありません)'}</div>
+    <div id="revList">${revs.map(r=>`
+      <div class="rev">
+        <div class="rev-head"><span class="rev-stars">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}</span>
+        <span class="rev-name">${r.n?escapeHtml(r.n):'自分'}</span>
+        <span class="rev-date">${new Date(r.t).toLocaleDateString('ja-JP')}</span>${r.y?`<span class="rev-yen">¥${r.y.toLocaleString()}</span>`:''}</div>
+        <div>${escapeHtml(r.c||'')}</div>
+        ${r.p && String(r.p).indexOf('data:image')===0 ? `<img class="rev-photo" src="${r.p}" onclick="showPhoto(this.src)" alt="料理写真">` : ''}
+      </div>`).join('') || '<div style="font-size:12.5px;color:var(--ink2)">まだ記録がありません。行ったら星とひとことを残しましょう。</div>'}
+    </div>
+    <div class="m-h">記録を書く</div>
+    <div class="fform">
+      <div class="starpick" id="starPick">${[1,2,3,4,5].map(i=>`<button data-v="${i}">★</button>`).join('')}</div>
+      <input id="revPrice" type="number" inputmode="numeric" placeholder="支払った金額(円・任意)例:1200" min="0" max="99999">
+      <textarea id="revComment" placeholder="感想・おすすめメニュー・混雑状況など" maxlength="300"></textarea>
+      <label class="photolabel" id="photoLabel">📷 料理の写真を添付(任意)<input type="file" id="revPhoto" accept="image/*"></label>
+      <br><button class="btn" id="revSubmit" disabled onclick="submitReview('${id}')">投稿する</button>
+      <div class="notice">※ 記録はこの端末のブラウザにのみ保存されます(他の人には見えません)。</div>
+    </div>`;
+  document.getElementById('starPick').querySelectorAll('button').forEach(b=>{
+    b.onclick=()=>{
+      pickStars = +b.dataset.v;
+      document.getElementById('starPick').querySelectorAll('button').forEach(x=>
+        x.classList.toggle('lit', +x.dataset.v<=pickStars));
+      document.getElementById('revSubmit').disabled = false;
+    };
+  });
+  document.getElementById('revPhoto').onchange = e=>{
+    const f = e.target.files[0];
+    document.getElementById('photoLabel').firstChild.textContent = f ? `📷 ${f.name} を添付済み ` : '📷 料理の写真を添付(任意)';
+  };
+  fillPhotoStrip(s);
+  document.getElementById('overlay').classList.add('show');
+  drawMap(filtered());
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
+document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
+function escapeHtml(t){ return String(t).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function showPhoto(src){
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('show');
+}
+
+/* ================= 店舗写真(Google Places API/個人キー) ================= */
+let gmapsReady = null;
+const PHOTO_CACHE = {};
+function getGKey(){ try{ return (localStorage.getItem('lunchmap-gmaps-key')||'').trim(); }catch(e){ return ''; } }
+function setGKey(){
+  const k = prompt('Google Maps Platform のAPIキーを入力してください(空欄にすると解除)。\nキーはこの端末のブラウザにだけ保存されます。', getGKey());
+  if(k === null) return;
+  try{ localStorage.setItem('lunchmap-gmaps-key', k.trim()); }catch(e){ alert('この環境ではキーを保存できません'); return; }
+  location.reload();
+}
+function loadGmaps(){
+  const key = getGKey();
+  if(!key) return null;
+  if(gmapsReady) return gmapsReady;
+  gmapsReady = new Promise((res, rej)=>{
+    window.__gmapsCb = ()=>res(true);
+    const sc = document.createElement('script');
+    sc.src = 'https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&v=weekly&loading=async&callback=__gmapsCb';
+    sc.onerror = ()=>rej(new Error('load error'));
+    document.head.appendChild(sc);
+  });
+  return gmapsReady;
+}
+async function loadPlacePhotos(s){
+  if(PHOTO_CACHE[s.id]) return PHOTO_CACHE[s.id];
+  const ready = loadGmaps();
+  if(!ready) return null;
+  await ready;
+  const {Place} = await google.maps.importLibrary('places');
+  const p = new Place({id: s.pid});
+  await p.fetchFields({fields:['photos']});
+  const urls = (p.photos||[]).slice(0,6).map(ph=>ph.getURI({maxWidth:800, maxHeight:800}));
+  PHOTO_CACHE[s.id] = urls;
+  return urls;
+}
+function fillPhotoStrip(s){
+  const el = document.getElementById('photoStrip');
+  if(!el) return;
+  if(!getGKey()){
+    el.innerHTML = '<a class="setkey" onclick="setGKey()">🔑 Google APIキー(無料枠あり)を設定すると、ここに店・料理・メニューの写真が表示されます</a>';
+    return;
+  }
+  el.innerHTML = '<span style="font-size:12px;color:var(--ink2)">写真を読み込み中…</span>';
+  loadPlacePhotos(s).then(urls=>{
+    el.innerHTML = (urls && urls.length)
+      ? urls.map(u=>`<img src="${u}" loading="lazy" onclick="showPhoto(this.src)" alt="店の写真">`).join('')
+      : '<span style="font-size:12px;color:var(--ink2)">この店の写真が見つかりませんでした</span>';
+  }).catch(()=>{
+    el.innerHTML = '<span style="font-size:12px;color:#C0392B">写真を取得できませんでした。APIキーと「Places API (New)」の有効化を確認してください。<a class="setkey" style="border:none;padding:0 4px" onclick="setGKey()">キーを再設定</a></span>';
+  });
+}
+
+// 画像を縮小・圧縮してdata URLに(共有ファイルが太りすぎないように)
+function compressImage(file, maxSide, quality){
+  return new Promise(res=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const sc = Math.min(1, maxSide/Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width*sc));
+      c.height = Math.max(1, Math.round(img.height*sc));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      res(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = ()=>res(null);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function submitReview(id){
+  const btn = document.getElementById('revSubmit');
+  btn.disabled = true; btn.textContent='保存中…';
+  const rev = {s:pickStars, n:'',
+               c:document.getElementById('revComment').value.trim(), t:Date.now()};
+  const yen = parseInt(document.getElementById('revPrice').value, 10);
+  if(yen > 0 && yen < 100000) rev.y = yen;
+  const file = document.getElementById('revPhoto').files[0];
+  if(file){
+    let p = await compressImage(file, 900, 0.72);
+    if(p && p.length > 400000) p = await compressImage(file, 700, 0.55); // まだ大きければ更に圧縮
+    if(p && p.length <= 400000) rev.p = p;
+    else if(p) alert('写真の圧縮に失敗したため、写真なしで投稿します。');
+  }
+  const res = await saveReview(id, rev);
+  openModal(id); // 再描画
+  render();
+  if(res !== 'saved'){
+    alert('この環境では保存できないため、画面を閉じると記録が消えます。');
+  }
+}
+
+/* ================= 起動 ================= */
+function tick(){
+  const d = new Date();
+  const days = ['日','月','火','水','木','金','土'];
+  document.getElementById('clock').textContent =
+    `${d.getMonth()+1}/${d.getDate()}(${days[d.getDay()]}) ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} 現在`;
+}
+(async function init(){
+  document.getElementById('shopTotal').textContent = TOTAL;
+  tick(); setInterval(()=>{tick(); render();}, 60000);
+  buildChips();
+  initMap();
+  await loadReviews();
+  render();
+})();
+</script>
+</body>
+</html>
