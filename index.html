@@ -42,6 +42,7 @@
   .switch input{accent-color:var(--ink);width:15px;height:15px}
   .count{margin-left:auto;font-size:12px;color:var(--ink2)}
   .count b{font-size:15px;color:var(--ink)}
+  .fbar{display:none}
 
   /* layout */
   .main{display:grid;grid-template-columns:minmax(340px,46%) 1fr;gap:18px;margin-top:16px;align-items:start}
@@ -136,9 +137,25 @@
   /* ===== スマホ最適化 ===== */
   @media(max-width:640px){
     .wrap{padding:0 12px calc(40px + env(safe-area-inset-bottom))}
-    header{padding:16px 0 10px}
-    h1{font-size:21px}
-    .sub{font-size:11px}
+    header{padding:10px 0 8px}
+    .kicker{display:none}
+    h1{font-size:19px}
+    .sub{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* フィルタは「絞り込み」バーに畳み、展開時は地図にオーバーレイ表示 */
+    .filters{padding:8px 0}
+    .fbar{display:flex;align-items:center;gap:8px;width:100%;background:var(--card);
+      border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;
+      font-size:13px;font-weight:700;color:var(--ink);font-family:inherit;cursor:pointer}
+    .fbar-badge{background:var(--ink);color:#fff;border-radius:999px;font-size:11px;padding:1px 7px;margin-left:6px}
+    .fbar-count{margin-left:auto;color:var(--ink2);font-weight:600;font-size:12px}
+    .fbar-count b{color:var(--ink);font-size:14px}
+    .fbar-caret{transition:transform .15s}
+    .filters.open .fbar-caret{transform:rotate(180deg)}
+    .fbody{display:none}
+    .filters.open .fbody{display:block;position:absolute;left:0;right:0;top:100%;
+      background:var(--bg);padding:10px 12px 12px;border-bottom:1px solid var(--line);
+      box-shadow:0 10px 18px rgba(23,36,45,.14);
+      max-height:calc(100svh - 120px);overflow-y:auto}
     /* チップ行は折り返さず横スクロール(縦の場所を節約) */
     .frow{flex-wrap:nowrap;align-items:center}
     .flabel{width:42px;font-size:10px}
@@ -148,7 +165,8 @@
     .frow select{padding:8px 6px}
     .switch{white-space:nowrap}
     .count{display:none}
-    #lmap{height:52vh;min-height:300px;max-height:440px}
+    /* ヘッダー+折りたたみバーを差し引き、初期表示で地図全体が収まる高さ(svh=iOSアドレスバー表示時基準) */
+    #lmap{height:calc(100vh - 190px);height:calc(100svh - 190px);min-height:280px;max-height:520px}
     .card{padding:12px 13px}
     .c-name{font-size:15px}
     .c-meta{font-size:11.5px;gap:5px 10px}
@@ -170,7 +188,13 @@
   <div class="sub">渋谷区広尾1-1-39 恵比寿プライムスクエアタワー起点/昼休み60分で往復できる徒歩圏・ランチ営業店のみ掲載 ─ <span class="clock" id="clock"></span></div>
 </header>
 
-<div class="filters">
+<div class="filters" id="filters">
+  <button class="fbar" id="fbar" type="button" aria-expanded="false" aria-controls="fbody">
+    <span>絞り込み<span class="fbar-badge" id="fbarBadge" hidden>0</span></span>
+    <span class="fbar-count"><b id="fbarCount">0</b>軒表示中</span>
+    <span class="fbar-caret" aria-hidden="true">▾</span>
+  </button>
+  <div class="fbody" id="fbody">
   <div class="frow">
     <span class="flabel">カテゴリ</span>
     <div id="catChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -186,6 +210,7 @@
   <div class="frow">
     <span class="flabel">表示</span>
     <label class="switch"><input type="checkbox" id="openToggle" checked>本日営業の店のみ</label>
+    <label class="switch"><input type="checkbox" id="unvisitedToggle">未訪問の店のみ</label>
     <select id="sortSel">
       <option value="dist">近い順</option>
       <option value="g">Google評価順</option>
@@ -193,6 +218,7 @@
       <option value="stay">滞在時間が長い順</option>
     </select>
     <span class="count"><b id="countNum">0</b> 軒表示中</span>
+  </div>
   </div>
   <div class="banner" id="storageBanner"></div>
 </div>
@@ -208,7 +234,7 @@
   </div>
 </div>
 
-<div class="foot">記録はこの端末のブラウザに保存されます ─ <a href="javascript:void(0)" onclick="exportReviews()">バックアップ書出し</a> / <a href="javascript:void(0)" onclick="importReviews()">取込み</a> / <a href="javascript:void(0)" onclick="setGKey()">店舗写真の表示設定(Google APIキー)</a></div>
+<div class="foot">記録はこの端末のブラウザに保存されます ─ <a href="javascript:void(0)" onclick="exportReviews()">バックアップ書出し</a> / <a href="javascript:void(0)" onclick="importReviews()">取込み</a> / <a href="javascript:void(0)" onclick="setGKey()">店舗写真の表示設定(Google APIキー)</a><span id="shareFoot" hidden> / <a href="javascript:void(0)" onclick="uploadAllShared()">未共有の記録を一括共有</a></span><span id="pubFoot"><br>みんなに記録を公開する: <a href="javascript:void(0)" onclick="exportPublish()">公開用書出し(reviews.json)</a> → GitHubリポジトリにアップロードで反映</span></div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -217,6 +243,12 @@
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('show')"><img id="lightboxImg" alt="料理写真"></div>
 
 <script>
+/* ===== みんなで共有(Supabase)。空のままなら従来のローカルのみ動作 ===== */
+const SB_URL = 'https://ruywwsmqmpxgvuubedzr.supabase.co';  // 例 'https://xxxx.supabase.co'
+const SB_KEY = 'sb_publishable_HTxR894mQrhJCD5UbHjDdA_PH7idqtq';  // anon public キー(公開前提。保護はRLS)
+const sbOn = () => !!(SB_URL && SB_KEY);
+const sbHead = extra => Object.assign({apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY}, extra || {});
+
 /* ================= データ ================= */
 const ORIGIN = {lat:35.650109, lng:139.7125988}; // 恵比寿プライムスクエアタワー(広尾1-1-39)
 const STATION = {lat:35.6467, lng:139.7101, name:'恵比寿駅'};
@@ -558,6 +590,11 @@ const fmt = m=>`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
 let REVIEWS = {};
 let persistMode = 'none'; // claude | local | memory
 const RKEY = 'lunchmap-reviews-v1';
+const NKEY = 'lunchmap-name';
+function getMyName(){ try{ return (localStorage.getItem(NKEY)||'').trim(); }catch(e){ return ''; } }
+function saveMyName(n){ try{ localStorage.setItem(NKEY, n); }catch(e){} }
+// 写真は共有データにも入るため、data:image/jpeg;base64 の厳格な形式のみ描画する(XSS対策)
+const SAFE_IMG = p => typeof p==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(p);
 
 async function loadReviews(){
   // Claude上で開いた場合は個人ストレージ
@@ -594,6 +631,89 @@ async function persist(){
 async function saveReview(shopId, rev){
   (REVIEWS[shopId] = REVIEWS[shopId]||[]).push(rev);
   return (await persist()) ? 'saved' : 'local';
+}
+
+// GitHub Pages上のreviews.json(公開された記録)を読み込んでマージ
+async function loadPublished(){
+  if(location.protocol.indexOf('http') !== 0) return;
+  try{
+    const r = await fetch('reviews.json', {cache:'no-store'});
+    if(!r.ok) return;
+    const pub = await r.json();
+    Object.values(pub||{}).forEach(arr=>(arr||[]).forEach(x=>{
+      if(x && !x.n) x.n = '投稿者';
+      if(x) x.pub = 1;
+    }));
+    REVIEWS = mergeReviews(REVIEWS, pub);
+  }catch(e){}
+}
+
+/* ===== 共有レビュー(Supabase / PostgREST REST API) ===== */
+function rowToRev(row){
+  const rev = {s: row.stars, t: +row.t, n: row.name || '投稿者', c: row.comment || '', pub: 1};
+  if(row.yen > 0) rev.y = row.yen;
+  if(row.photo) rev.p = row.photo;
+  return rev;
+}
+function revToRow(shopId, rev, nameFallback){
+  return {shop_id: shopId, stars: rev.s, yen: (rev.y > 0 ? rev.y : null),
+          comment: rev.c || '', name: rev.n || nameFallback || '', photo: rev.p || null, t: rev.t};
+}
+
+// 起動時に共有レビューを全件取得してマージ(1000件ずつページング)
+async function loadShared(){
+  if(!sbOn()) return;
+  try{
+    const pub = {};
+    for(let off = 0;; off += 1000){
+      const r = await fetch(SB_URL + '/rest/v1/reviews?select=shop_id,stars,yen,comment,name,photo,t&order=t.asc&limit=1000&offset=' + off,
+        {headers: sbHead()});
+      if(!r.ok) return;
+      const rows = await r.json();
+      rows.forEach(x => { (pub[x.shop_id] = pub[x.shop_id] || []).push(rowToRev(x)); });
+      if(rows.length < 1000) break;
+    }
+    REVIEWS = mergeReviews(REVIEWS, pub);
+  }catch(e){}
+}
+
+async function pushShared(shopId, rev){
+  if(!sbOn()) return 'off';
+  try{
+    const r = await fetch(SB_URL + '/rest/v1/reviews', {
+      method: 'POST',
+      headers: sbHead({'Content-Type': 'application/json', 'Prefer': 'return=minimal'}),
+      body: JSON.stringify(revToRow(shopId, rev))
+    });
+    return r.ok ? 'shared' : 'fail';
+  }catch(e){ return 'fail'; }
+}
+
+// この端末の未共有記録(共有由来 pub と公開OFF priv を除く)を一括アップロード。
+// DB側の unique(shop_id,t,stars) + ignore-duplicates で何度実行しても重複しない
+async function uploadAllShared(){
+  if(!sbOn()){ alert('共有機能が設定されていません。'); return; }
+  const rows = [];
+  Object.entries(REVIEWS).forEach(([id, arr])=>(arr||[]).forEach(r=>{
+    if(r && !r.pub && !r.priv && typeof r.s === 'number') rows.push([id, r]);
+  }));
+  if(!rows.length){ alert('共有する記録がありません。'); return; }
+  let name = getMyName();
+  if(rows.some(([,r])=>!r.n)){
+    const inp = prompt('名前が未設定の記録があります。公開時に表示する名前を入力してください(例:渡邉)', name);
+    if(inp === null) return;
+    name = inp.trim() || '投稿者';
+    saveMyName(name);
+  }
+  if(!confirm(`${rows.length}件の記録をみんなに公開します。コメント・支払額・写真も公開されます。よろしいですか?`)) return;
+  try{
+    const r = await fetch(SB_URL + '/rest/v1/reviews?on_conflict=shop_id,t,stars', {
+      method: 'POST',
+      headers: sbHead({'Content-Type': 'application/json', 'Prefer': 'return=minimal,resolution=ignore-duplicates'}),
+      body: JSON.stringify(rows.map(([id, r])=>revToRow(id, r, name)))
+    });
+    alert(r.ok ? '共有しました。次回以降、このページを見る全員に表示されます。' : '共有に失敗しました。時間をおいて再度お試しください。');
+  }catch(e){ alert('共有に失敗しました(通信状況を確認してください)。'); }
 }
 
 function teamAvg(id){
@@ -667,6 +787,20 @@ function exportReviews(){
   a.href = URL.createObjectURL(new Blob([JSON.stringify(REVIEWS)], {type:'application/json'}));
   a.download = 'lunchmap-backup.json'; a.click();
 }
+// 公開用書き出し:GitHubリポジトリに置くreviews.jsonを生成
+function exportPublish(){
+  const name = prompt('公開時に表示する名前を入力してください(例:渡邉)', '');
+  if(name === null) return;
+  const out = JSON.parse(JSON.stringify(REVIEWS));
+  Object.values(out).forEach(arr=>arr.forEach(r=>{
+    if(!r.n) r.n = name || '投稿者';
+    r.pub = 1;
+  }));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], {type:'application/json'}));
+  a.download = 'reviews.json'; a.click();
+  alert('reviews.json を書き出しました。\nGitHubのリポジトリで「Add file → Upload files」からアップロード(上書き)すると、1〜2分後にこのページを見る全員に反映されます。\n※コメント・支払額・写真も含めて公開されます。');
+}
 function importReviews(){
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = '.json';
@@ -680,7 +814,7 @@ function importReviews(){
 }
 
 /* ================= フィルタ状態 ================= */
-const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, sort:'dist', selected:null};
+const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, unvisitedOnly:false, sort:'dist', selected:null};
 
 function buildChips(){
   const cc = document.getElementById('catChips');
@@ -710,7 +844,27 @@ function buildChips(){
     wc.appendChild(b);
   });
   document.getElementById('openToggle').onchange=e=>{ state.openOnly=e.target.checked; render(); };
+  document.getElementById('unvisitedToggle').onchange=e=>{ state.unvisitedOnly=e.target.checked; render(); };
   document.getElementById('sortSel').onchange=e=>{ state.sort=e.target.value; render(); };
+}
+
+// 適用中の絞り込み数(「本日営業」はデフォルトONなので数えない)
+function activeFilterCount(){
+  return state.cats.size + state.prices.size + (state.maxWalk ? 1 : 0) + (state.unvisitedOnly ? 1 : 0);
+}
+
+// スマホ用: フィルタの折りたたみバー(PCではCSSで非表示・常時展開)
+function initFilterBar(){
+  const f = document.getElementById('filters');
+  const bar = document.getElementById('fbar');
+  bar.onclick = ()=>{ bar.setAttribute('aria-expanded', f.classList.toggle('open')); };
+  // パネル外をタップしたら閉じる(パネル内のチップ操作では閉じない)
+  document.addEventListener('click', e=>{
+    if(f.classList.contains('open') && !f.contains(e.target)){
+      f.classList.remove('open');
+      bar.setAttribute('aria-expanded','false');
+    }
+  });
 }
 
 function filtered(){
@@ -719,6 +873,7 @@ function filtered(){
     if(state.prices.size && !state.prices.has(s.price)) return false;
     if(state.maxWalk && s.walk > state.maxWalk) return false;
     if(state.openOnly && openState(s).code==='closed') return false;
+    if(state.unvisitedOnly && (REVIEWS[s.id]||[]).some(r=>!r.pub)) return false; // 訪問済み=自分の記録がある店
     return true;
   });
   const key = state.sort;
@@ -818,7 +973,7 @@ function renderCards(list){
     const badgeCls = st.code==='now'?'open-now':(st.code==='closed'||st.code==='done')?'closed-day':'open-later';
     const ta = teamAvg(s.id);
     const stayCls = s.stay>=40?'stay-ok':'stay-tight';
-    const ph = (REVIEWS[s.id]||[]).map(r=>r.p).filter(p=>p&&String(p).indexOf('data:image')===0).pop();
+    const ph = (REVIEWS[s.id]||[]).map(r=>r.p).filter(SAFE_IMG).pop();
     const ps = paidStats(s.id);
     return `<div class="card${st.code==='closed'?' closedToday':''}${ph?' hasThumb':''}" data-id="${s.id}" style="border-left-color:${CATS[s.cat]}">
       ${ph?`<img class="c-thumb" src="${ph}" alt="">`:''}
@@ -846,6 +1001,11 @@ function renderCards(list){
 function render(){
   const list = filtered();
   document.getElementById('countNum').textContent = list.length;
+  const n = activeFilterCount();
+  const badge = document.getElementById('fbarBadge');
+  badge.hidden = n === 0;
+  badge.textContent = n;
+  document.getElementById('fbarCount').textContent = list.length;
   renderCards(list);
   drawMap(list);
 }
@@ -878,24 +1038,28 @@ function openModal(id){
     </div>
     <a class="m-link" href="${gm}" target="_blank" rel="noopener">Google Mapsで経路・店の写真を見る →</a><br>
     <a class="m-link" href="${gi}" target="_blank" rel="noopener">メニュー・料理の画像を検索 →</a>
-    <div class="m-h">自分の記録 ${ta?`平均 ${ta.avg.toFixed(1)}(${ta.n}件)`:'(まだありません)'}</div>
+    <div class="m-h">${sbOn()?'みんなの記録':'自分の記録'} ${ta?`平均 ${ta.avg.toFixed(1)}(${ta.n}件)`:'(まだありません)'}</div>
     <div id="revList">${revs.map(r=>`
       <div class="rev">
         <div class="rev-head"><span class="rev-stars">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}</span>
-        <span class="rev-name">${r.n?escapeHtml(r.n):'自分'}</span>
+        <span class="rev-name">${r.pub ? escapeHtml(r.n||'投稿者') : (r.n ? escapeHtml(r.n)+'(自分)' : '自分')}</span>
         <span class="rev-date">${new Date(r.t).toLocaleDateString('ja-JP')}</span>${r.y?`<span class="rev-yen">¥${r.y.toLocaleString()}</span>`:''}</div>
         <div>${escapeHtml(r.c||'')}</div>
-        ${r.p && String(r.p).indexOf('data:image')===0 ? `<img class="rev-photo" src="${r.p}" onclick="showPhoto(this.src)" alt="料理写真">` : ''}
+        ${SAFE_IMG(r.p) ? `<img class="rev-photo" src="${r.p}" onclick="showPhoto(this.src)" alt="料理写真">` : ''}
       </div>`).join('') || '<div style="font-size:12.5px;color:var(--ink2)">まだ記録がありません。行ったら星とひとことを残しましょう。</div>'}
     </div>
     <div class="m-h">記録を書く</div>
     <div class="fform">
       <div class="starpick" id="starPick">${[1,2,3,4,5].map(i=>`<button data-v="${i}">★</button>`).join('')}</div>
+      ${sbOn()?`<input id="revName" type="text" maxlength="20" placeholder="名前(公開時に表示)" value="${escapeHtml(getMyName())}">`:''}
       <input id="revPrice" type="number" inputmode="numeric" placeholder="支払った金額(円・任意)例:1200" min="0" max="99999">
       <textarea id="revComment" placeholder="感想・おすすめメニュー・混雑状況など" maxlength="300"></textarea>
       <label class="photolabel" id="photoLabel">📷 料理の写真を添付(任意)<input type="file" id="revPhoto" accept="image/*"></label>
+      ${sbOn()?`<label class="switch" style="margin-bottom:8px"><input type="checkbox" id="revShare" checked>みんなに公開する</label>`:''}
       <br><button class="btn" id="revSubmit" disabled onclick="submitReview('${id}')">投稿する</button>
-      <div class="notice">※ 記録はこの端末のブラウザにのみ保存されます(他の人には見えません)。</div>
+      <div class="notice">${sbOn()
+        ?'※ 「みんなに公開する」ONの投稿はこのページを見る全員に表示されます(コメント・支払額・写真を含む)。OFFならこの端末のみに保存されます。'
+        :'※ 記録はこの端末のブラウザにのみ保存されます(他の人には見えません)。'}</div>
     </div>`;
   document.getElementById('starPick').querySelectorAll('button').forEach(b=>{
     b.onclick=()=>{
@@ -995,8 +1159,14 @@ function compressImage(file, maxSide, quality){
 async function submitReview(id){
   const btn = document.getElementById('revSubmit');
   btn.disabled = true; btn.textContent='保存中…';
-  const rev = {s:pickStars, n:'',
+  const nameEl = document.getElementById('revName');
+  const name = nameEl ? nameEl.value.trim().slice(0,20) : '';
+  if(name) saveMyName(name);
+  const shareEl = document.getElementById('revShare');
+  const share = sbOn() && (!shareEl || shareEl.checked);
+  const rev = {s:pickStars, n:name,
                c:document.getElementById('revComment').value.trim(), t:Date.now()};
+  if(!share) rev.priv = 1; // ローカル限定(一括共有からも除外)
   const yen = parseInt(document.getElementById('revPrice').value, 10);
   if(yen > 0 && yen < 100000) rev.y = yen;
   const file = document.getElementById('revPhoto').files[0];
@@ -1007,10 +1177,14 @@ async function submitReview(id){
     else if(p) alert('写真の圧縮に失敗したため、写真なしで投稿します。');
   }
   const res = await saveReview(id, rev);
+  const shared = share ? await pushShared(id, rev) : 'off';
   openModal(id); // 再描画
   render();
   if(res !== 'saved'){
     alert('この環境では保存できないため、画面を閉じると記録が消えます。');
+  }
+  if(shared === 'fail'){
+    alert('みんなへの共有に失敗しました(通信状況を確認してください)。記録はこの端末には保存済みです。フッターの「未共有の記録を一括共有」から後で再送できます。');
   }
 }
 
@@ -1025,9 +1199,22 @@ function tick(){
   document.getElementById('shopTotal').textContent = TOTAL;
   tick(); setInterval(()=>{tick(); render();}, 60000);
   buildChips();
+  initFilterBar();
   initMap();
+  let __rsT;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(__rsT);
+    __rsT = setTimeout(()=>{ if(LMAP) LMAP.invalidateSize(); }, 200);
+  });
   await loadReviews();
+  await loadPublished();
   render();
+  // 共有レビューは描画をブロックせず取得(無料枠プロジェクトの休止復帰・オフラインでも先にローカル表示)
+  loadShared().then(()=>render());
+  if(sbOn()){
+    document.getElementById('shareFoot').hidden = false;
+    document.getElementById('pubFoot').hidden = true;
+  }
 })();
 </script>
 </body>
