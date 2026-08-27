@@ -116,7 +116,8 @@
   .photostrip img{height:112px;border-radius:8px;cursor:zoom-in;flex:0 0 auto;border:1px solid var(--line)}
   .setkey{display:inline-block;font-size:12px;font-weight:700;color:var(--sushi);text-decoration:none;border:1.5px dashed var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
   .starpick{display:flex;gap:4px;margin:6px 0 10px}
-  .rev-photo{width:88px;height:88px;object-fit:cover;border-radius:8px;margin-top:6px;cursor:zoom-in;border:1px solid var(--line)}
+  .rev-photos{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .rev-photo{width:88px;height:88px;object-fit:cover;border-radius:8px;cursor:zoom-in;border:1px solid var(--line)}
   .c-thumb{position:absolute;right:14px;top:14px;width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
   .card.hasThumb{padding-right:88px}
   .photolabel{display:inline-block;font-size:12px;font-weight:700;color:var(--ink2);border:1.5px dashed var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;margin-bottom:8px}
@@ -595,6 +596,8 @@ function getMyName(){ try{ return (localStorage.getItem(NKEY)||'').trim(); }catc
 function saveMyName(n){ try{ localStorage.setItem(NKEY, n); }catch(e){} }
 // 写真は共有データにも入るため、data:image/jpeg;base64 の厳格な形式のみ描画する(XSS対策)
 const SAFE_IMG = p => typeof p==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(p);
+// レビュー1件の写真を配列で取り出す(p: 1枚は文字列・複数は配列、最大3枚)
+const revPhotos = r => (Array.isArray(r.p) ? r.p : r.p ? [r.p] : []).filter(SAFE_IMG).slice(0, 3);
 
 async function loadReviews(){
   // Claude上で開いた場合は個人ストレージ
@@ -652,12 +655,16 @@ async function loadPublished(){
 function rowToRev(row){
   const rev = {s: row.stars, t: +row.t, n: row.name || '投稿者', c: row.comment || '', pub: 1};
   if(row.yen > 0) rev.y = row.yen;
-  if(row.photo) rev.p = row.photo;
+  if(row.photo){
+    const ps = row.photo.split('|').filter(SAFE_IMG);
+    if(ps.length) rev.p = ps.length === 1 ? ps[0] : ps;
+  }
   return rev;
 }
 function revToRow(shopId, rev, nameFallback){
+  const ps = revPhotos(rev);
   return {shop_id: shopId, stars: rev.s, yen: (rev.y > 0 ? rev.y : null),
-          comment: rev.c || '', name: rev.n || nameFallback || '', photo: rev.p || null, t: rev.t};
+          comment: rev.c || '', name: rev.n || nameFallback || '', photo: ps.length ? ps.join('|') : null, t: rev.t};
 }
 
 // 起動時に共有レビューを全件取得してマージ(1000件ずつページング)
@@ -973,7 +980,7 @@ function renderCards(list){
     const badgeCls = st.code==='now'?'open-now':(st.code==='closed'||st.code==='done')?'closed-day':'open-later';
     const ta = teamAvg(s.id);
     const stayCls = s.stay>=40?'stay-ok':'stay-tight';
-    const ph = (REVIEWS[s.id]||[]).map(r=>r.p).filter(SAFE_IMG).pop();
+    const ph = (REVIEWS[s.id]||[]).flatMap(revPhotos).pop();
     const ps = paidStats(s.id);
     return `<div class="card${st.code==='closed'?' closedToday':''}${ph?' hasThumb':''}" data-id="${s.id}" style="border-left-color:${CATS[s.cat]}">
       ${ph?`<img class="c-thumb" src="${ph}" alt="">`:''}
@@ -1045,7 +1052,7 @@ function openModal(id){
         <span class="rev-name">${r.pub ? escapeHtml(r.n||'投稿者') : (r.n ? escapeHtml(r.n)+'(自分)' : '自分')}</span>
         <span class="rev-date">${new Date(r.t).toLocaleDateString('ja-JP')}</span>${r.y?`<span class="rev-yen">¥${r.y.toLocaleString()}</span>`:''}</div>
         <div>${escapeHtml(r.c||'')}</div>
-        ${SAFE_IMG(r.p) ? `<img class="rev-photo" src="${r.p}" onclick="showPhoto(this.src)" alt="料理写真">` : ''}
+        ${revPhotos(r).length ? `<div class="rev-photos">${revPhotos(r).map(p=>`<img class="rev-photo" src="${p}" onclick="showPhoto(this.src)" alt="料理写真">`).join('')}</div>` : ''}
       </div>`).join('') || '<div style="font-size:12.5px;color:var(--ink2)">まだ記録がありません。行ったら星とひとことを残しましょう。</div>'}
     </div>
     <div class="m-h">記録を書く</div>
@@ -1054,7 +1061,7 @@ function openModal(id){
       ${sbOn()?`<input id="revName" type="text" maxlength="20" placeholder="名前(公開時に表示)" value="${escapeHtml(getMyName())}">`:''}
       <input id="revPrice" type="number" inputmode="numeric" placeholder="支払った金額(円・任意)例:1200" min="0" max="99999">
       <textarea id="revComment" placeholder="感想・おすすめメニュー・混雑状況など" maxlength="300"></textarea>
-      <label class="photolabel" id="photoLabel">📷 料理の写真を添付(任意)<input type="file" id="revPhoto" accept="image/*"></label>
+      <label class="photolabel" id="photoLabel">📷 料理の写真を添付(任意・3枚まで)<input type="file" id="revPhoto" accept="image/*" multiple></label>
       ${sbOn()?`<label class="switch" style="margin-bottom:8px"><input type="checkbox" id="revShare" checked>みんなに公開する</label>`:''}
       <br><button class="btn" id="revSubmit" disabled onclick="submitReview('${id}')">投稿する</button>
       <div class="notice">${sbOn()
@@ -1070,8 +1077,9 @@ function openModal(id){
     };
   });
   document.getElementById('revPhoto').onchange = e=>{
-    const f = e.target.files[0];
-    document.getElementById('photoLabel').firstChild.textContent = f ? `📷 ${f.name} を添付済み ` : '📷 料理の写真を添付(任意)';
+    const n = e.target.files.length;
+    document.getElementById('photoLabel').firstChild.textContent =
+      n ? `📷 ${Math.min(n,3)}枚を添付済み${n>3?'(先頭3枚のみ使用)':''} ` : '📷 料理の写真を添付(任意・3枚まで)';
   };
   fillPhotoStrip(s);
   document.getElementById('overlay').classList.add('show');
@@ -1169,12 +1177,20 @@ async function submitReview(id){
   if(!share) rev.priv = 1; // ローカル限定(一括共有からも除外)
   const yen = parseInt(document.getElementById('revPrice').value, 10);
   if(yen > 0 && yen < 100000) rev.y = yen;
-  const file = document.getElementById('revPhoto').files[0];
-  if(file){
-    let p = await compressImage(file, 900, 0.72);
-    if(p && p.length > 400000) p = await compressImage(file, 700, 0.55); // まだ大きければ更に圧縮
-    if(p && p.length <= 400000) rev.p = p;
-    else if(p) alert('写真の圧縮に失敗したため、写真なしで投稿します。');
+  const files = Array.from(document.getElementById('revPhoto').files).slice(0, 3);
+  if(files.length){
+    const photos = [];
+    let failed = 0;
+    for(const f of files){
+      let p = await compressImage(f, 900, 0.72);
+      if(p && p.length > 400000) p = await compressImage(f, 700, 0.55); // まだ大きければ更に圧縮
+      if(p && p.length <= 400000) photos.push(p);
+      else failed++;
+    }
+    if(photos.length) rev.p = photos.length === 1 ? photos[0] : photos;
+    if(failed) alert(failed === files.length
+      ? '写真の圧縮に失敗したため、写真なしで投稿します。'
+      : `${failed}枚の写真は圧縮に失敗したため除外しました。`);
   }
   const res = await saveReview(id, rev);
   const shared = share ? await pushShared(id, rev) : 'off';
