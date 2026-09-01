@@ -235,7 +235,7 @@
   </div>
 </div>
 
-<div class="foot">記録はこの端末のブラウザに保存されます ─ <a href="javascript:void(0)" onclick="exportReviews()">バックアップ書出し</a> / <a href="javascript:void(0)" onclick="importReviews()">取込み</a> / <a href="javascript:void(0)" onclick="setGKey()">店舗写真の表示設定(Google APIキー)</a><span id="shareFoot" hidden> / <a href="javascript:void(0)" onclick="uploadAllShared()">未共有の記録を一括共有</a></span><span id="pubFoot"><br>みんなに記録を公開する: <a href="javascript:void(0)" onclick="exportPublish()">公開用書出し(reviews.json)</a> → GitHubリポジトリにアップロードで反映</span></div>
+<div class="foot">記録はこの端末のブラウザに保存されます ─ <a href="javascript:void(0)" onclick="exportReviews()">バックアップ書出し</a> / <a href="javascript:void(0)" onclick="importReviews()">取込み</a> / <a href="javascript:void(0)" onclick="setGKey()">店舗写真の表示設定(Google APIキー)</a><span id="shareFoot" hidden> / <a href="javascript:void(0)" onclick="uploadAllShared()">未共有の記録を一括共有</a></span><span id="pubFoot"><br>みんなに記録を公開する: <a href="javascript:void(0)" onclick="exportPublish()">公開用書出し(reviews.json)</a> → GitHubリポジトリにアップロードで反映</span><span id="sbDown" hidden style="color:#c0392b"><br>⚠ 共有サーバー(Supabase)が停止中のため、みんなの記録の取得・共有ができません。ダッシュボードから再開してください。</span></div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -675,13 +675,25 @@ async function loadShared(){
     for(let off = 0;; off += 1000){
       const r = await fetch(SB_URL + '/rest/v1/reviews?select=shop_id,stars,yen,comment,name,photo,t&order=t.asc&limit=1000&offset=' + off,
         {headers: sbHead()});
-      if(!r.ok) return;
+      if(!r.ok){ if(r.status === 503) sbDownNotice(); return; }
       const rows = await r.json();
       rows.forEach(x => { (pub[x.shop_id] = pub[x.shop_id] || []).push(rowToRev(x)); });
       if(rows.length < 1000) break;
     }
     REVIEWS = mergeReviews(REVIEWS, pub);
   }catch(e){}
+}
+
+// 共有サーバー(Supabase無料枠の自動一時停止など)停止中の案内をフッターに表示
+function sbDownNotice(){
+  const el = document.getElementById('sbDown');
+  if(el) el.hidden = false;
+}
+
+// 共有失敗時のHTTPステータス別メッセージ
+function sbFailMsg(status){
+  if(status === 503) return '共有サーバー(Supabase)が一時停止中です。ダッシュボードからプロジェクトを再開してください。記録はこの端末には保存済みです。';
+  return `みんなへの共有に失敗しました(エラー${status || ':通信不可'})。記録はこの端末には保存済みです。フッターの「未共有の記録を一括共有」から後で再送できます。`;
 }
 
 async function pushShared(shopId, rev){
@@ -692,7 +704,10 @@ async function pushShared(shopId, rev){
       headers: sbHead({'Content-Type': 'application/json', 'Prefer': 'return=minimal'}),
       body: JSON.stringify(revToRow(shopId, rev))
     });
-    return r.ok ? 'shared' : 'fail';
+    if(r.ok) return 'shared';
+    if(r.status === 409) return 'shared'; // 重複=すでに共有済み。エラー扱いにしない
+    if(r.status === 503) sbDownNotice();
+    return r.status || 'fail';
   }catch(e){ return 'fail'; }
 }
 
@@ -719,7 +734,7 @@ async function uploadAllShared(){
       headers: sbHead({'Content-Type': 'application/json', 'Prefer': 'return=minimal,resolution=ignore-duplicates'}),
       body: JSON.stringify(rows.map(([id, r])=>revToRow(id, r, name)))
     });
-    alert(r.ok ? '共有しました。次回以降、このページを見る全員に表示されます。' : '共有に失敗しました。時間をおいて再度お試しください。');
+    alert(r.ok ? '共有しました。次回以降、このページを見る全員に表示されます。' : sbFailMsg(r.status));
   }catch(e){ alert('共有に失敗しました(通信状況を確認してください)。'); }
 }
 
@@ -1199,8 +1214,8 @@ async function submitReview(id){
   if(res !== 'saved'){
     alert('この環境では保存できないため、画面を閉じると記録が消えます。');
   }
-  if(shared === 'fail'){
-    alert('みんなへの共有に失敗しました(通信状況を確認してください)。記録はこの端末には保存済みです。フッターの「未共有の記録を一括共有」から後で再送できます。');
+  if(shared !== 'shared' && shared !== 'off'){
+    alert(sbFailMsg(shared === 'fail' ? 0 : shared));
   }
 }
 
