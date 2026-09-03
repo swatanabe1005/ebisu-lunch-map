@@ -728,14 +728,28 @@ async function uploadAllShared(){
     saveMyName(name);
   }
   if(!confirm(`${rows.length}件の記録をみんなに公開します。コメント・支払額・写真も公開されます。よろしいですか?`)) return;
-  try{
-    const r = await fetch(SB_URL + '/rest/v1/reviews?on_conflict=shop_id,t,stars', {
-      method: 'POST',
-      headers: sbHead({'Content-Type': 'application/json', 'Prefer': 'return=minimal,resolution=ignore-duplicates'}),
-      body: JSON.stringify(rows.map(([id, r])=>revToRow(id, r, name)))
-    });
-    alert(r.ok ? '共有しました。次回以降、このページを見る全員に表示されます。' : sbFailMsg(r.status));
-  }catch(e){ alert('共有に失敗しました(通信状況を確認してください)。'); }
+  // 1件ずつ送信(写真付きは1件で1MB超になりうるため一括だと失敗しやすい。
+  // 1件が制約違反でも他は共有でき、失敗理由も個別に取得できる)
+  let ok = 0, fail = 0, firstErr = '';
+  for(const [id, rev] of rows){
+    try{
+      const r = await fetch(SB_URL + '/rest/v1/reviews?on_conflict=shop_id,t,stars', {
+        method: 'POST',
+        headers: sbHead({'Content-Type': 'application/json', 'Prefer': 'return=minimal,resolution=ignore-duplicates'}),
+        body: JSON.stringify(revToRow(id, rev, name))
+      });
+      if(r.ok || r.status === 409){ ok++; continue; }
+      fail++;
+      if(r.status === 503) sbDownNotice();
+      if(!firstErr){
+        let msg = '';
+        try{ msg = (await r.json()).message || ''; }catch(e2){}
+        firstErr = `エラー${r.status}${msg ? ': ' + msg : ''}`;
+      }
+    }catch(e){ fail++; if(!firstErr) firstErr = '通信不可(通信状況を確認してください)'; }
+  }
+  if(!fail) alert(`${ok}件を共有しました。次回以降、このページを見る全員に表示されます。`);
+  else alert(`共有: 成功${ok}件/失敗${fail}件。失敗した記録はこの端末に保存済みで、後で再実行すれば未共有分だけ再送されます。\n最初の失敗内容: ${firstErr}`);
 }
 
 function teamAvg(id){
