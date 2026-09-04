@@ -84,23 +84,22 @@
   .closed-day{background:#F9E8E6;color:var(--warn)}
   .empty{padding:40px;text-align:center;color:var(--ink2);font-size:13.5px;background:var(--card);border-radius:14px;border:1px dashed var(--line)}
 
+  /* 検索ボックス */
+  .searchbox{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13.5px;font-family:inherit;background:var(--card);color:var(--ink);margin-bottom:10px}
+  .searchbox:focus{outline:none;border-color:var(--ink)}
+
   /* 画像グリッド表示 */
   .listhead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   .viewtoggle{display:flex;gap:0;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;width:max-content}
   .viewtoggle button{border:none;background:var(--card);color:var(--ink2);font-size:12.5px;font-weight:700;font-family:inherit;padding:7px 16px;cursor:pointer}
   .viewtoggle button.on{background:var(--ink);color:#fff}
-  .cards.gridview{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
-  .gcell{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;cursor:pointer;border:1px solid var(--line);background:var(--card);transition:.15s}
-  .gcell:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(23,36,45,.12)}
-  .gcell.closedToday{opacity:.55}
-  .gcell img{width:100%;height:100%;object-fit:cover;display:block}
-  .g-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:34px}
-  .g-info{position:absolute;left:0;right:0;bottom:0;padding:18px 8px 7px;background:linear-gradient(transparent,rgba(23,36,45,.78));color:#fff}
-  .gcell.noPhoto .g-info{background:linear-gradient(transparent,rgba(23,36,45,.45))}
-  .g-name{font-size:12.5px;font-weight:800;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .g-meta{font-size:10.5px;font-weight:700;opacity:.92;margin-top:2px;display:flex;gap:8px;font-variant-numeric:tabular-nums}
-  .g-meta .gm-star{color:#FFD666}
-  .g-open{position:absolute;top:6px;right:6px}
+  .pcard{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;cursor:pointer;transition:.15s}
+  .pcard:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(23,36,45,.08)}
+  .pcard.closedToday{opacity:.55}
+  .p-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-right:36px}
+  .p-meta{font-size:12px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .p-strip{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+  .p-strip img{height:130px;border-radius:10px;flex:0 0 auto;border:1px solid var(--line)}
 
   /* 店舗ごとの非表示切替 */
   .hiddenlistbtn{border:1.5px solid var(--line);background:var(--card);color:var(--ink2);font-size:12.5px;font-weight:700;font-family:inherit;padding:7px 14px;border-radius:10px;cursor:pointer}
@@ -112,7 +111,7 @@
   .hidebtn:hover{background:#fff;color:var(--ink)}
   .card .hidebtn{right:10px;bottom:10px}
   .card.hasThumb .hidebtn{right:10px}
-  .gcell .hidebtn{left:6px;top:6px}
+  .pcard .hidebtn{right:10px;top:10px}
 
   /* modal */
   .overlay{position:fixed;inset:0;background:rgba(23,36,45,.5);z-index:100;display:none;align-items:flex-end;justify-content:center}
@@ -199,13 +198,13 @@
     /* ヘッダー+折りたたみバーを差し引き、初期表示で地図全体が収まる高さ(svh=iOSアドレスバー表示時基準) */
     #lmap{height:calc(100vh - 190px);height:calc(100svh - 190px);min-height:280px;max-height:520px}
     .card{padding:12px 13px}
-    .cards.gridview{grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+    .p-strip img{height:104px}
     .c-name{font-size:15px}
     .c-meta{font-size:11.5px;gap:5px 10px}
     .m-close{width:40px;height:40px;font-size:18px}
     .starpick button{font-size:32px;padding:2px 4px}
     /* iOSの自動ズーム防止(16px未満のinputで発生) */
-    .fform input,.fform textarea{font-size:16px}
+    .fform input,.fform textarea,.searchbox{font-size:16px}
     .photostrip img{height:96px}
     .maplegend{font-size:10px;gap:6px 9px}
   }
@@ -261,6 +260,7 @@
     <div class="maplegend" id="legend"></div>
   </div>
   <div>
+    <input type="search" class="searchbox" id="searchBox" placeholder="🔍 店名・キーワードで検索" autocomplete="off">
     <div class="listhead">
       <div class="viewtoggle" id="viewToggle" role="tablist" aria-label="一覧の表示形式">
         <button type="button" data-view="list">📋 リスト</button>
@@ -1082,7 +1082,12 @@ function importReviews(){
 }
 
 /* ================= フィルタ状態 ================= */
-const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, unvisitedOnly:false, sort:'dist', view:'list', hiddenView:false, selected:null};
+const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, unvisitedOnly:false, sort:'dist', view:'list', hiddenView:false, q:'', selected:null};
+
+// 検索用の文字正規化(小文字化+カタカナ→ひらがな+空白除去)
+function normText(t){
+  return (t||'').toLowerCase().replace(/[ァ-ヶ]/g, c=>String.fromCharCode(c.charCodeAt(0)-0x60)).replace(/[\s　]+/g,'');
+}
 
 // 店舗ごとの非表示(localStorage永続化)。hiddenView はリロードで通常表示に戻すため保存しない
 const HIDDEN_KEY = 'lunchmap-hidden-v1';
@@ -1161,6 +1166,8 @@ function buildChips(){
   });
   // 非表示リストの表示切替
   document.getElementById('hiddenBtn').onclick=()=>{ state.hiddenView=!state.hiddenView; render(); };
+  // 検索(入力のたびに絞り込み)
+  document.getElementById('searchBox').oninput=e=>{ state.q=e.target.value; render(); };
 }
 
 // 適用中の絞り込み数(「本日営業」はデフォルトONなので数えない)
@@ -1184,8 +1191,10 @@ function initFilterBar(){
 
 function filtered(){
   // 非表示リスト表示中は他のフィルタを適用しない(営業中フィルタ等で復元できない店が出ないように)
+  const q = normText(state.q);
   let list = state.hiddenView ? SHOPS.filter(s=>HIDDEN.has(s.id)) : SHOPS.filter(s=>{
     if(HIDDEN.has(s.id)) return false;
+    if(q && !normText(s.name+s.cat+s.desc).includes(q)) return false;
     if(state.cats.size && !state.cats.has(s.cat)) return false;
     if(state.prices.size && !state.prices.has(s.price)) return false;
     if(state.maxWalk && s.walk > state.maxWalk) return false;
@@ -1313,28 +1322,27 @@ function renderCards(list){
   bindListEvents(box, '.card');
 }
 
-// 画像ベース一覧。写真は自分のレビュー写真の最新1枚、なければカテゴリ色プレースホルダ
-const CAT_EMOJI = {'定食・和食':'🍱','ラーメン・麺':'🍜','そば・うどん':'🥢','カレー':'🍛','中華':'🥟','寿司・海鮮':'🍣','肉・揚げ物':'🍖','アジア・エスニック':'🌶','バーガー・サンド':'🍔','イタリアン・洋食':'🍝','カフェ・軽食':'☕','弁当・テイクアウト':'🍙'};
+// 画像ベース一覧。写真が登録されている店のみを対象に、レビュー写真を横並びで全枚表示
 function renderGrid(list){
   const box = document.getElementById('cards');
-  document.getElementById('emptyMsg').style.display = list.length?'none':'block';
-  box.innerHTML = list.map(s=>{
+  const rows = list.map(s=>({s, photos:(REVIEWS[s.id]||[]).flatMap(revPhotos)})).filter(r=>r.photos.length);
+  document.getElementById('emptyMsg').style.display = rows.length?'none':'block';
+  box.innerHTML = rows.map(({s, photos})=>{
     const st = openState(s);
     const badgeCls = st.code==='now'?'open-now':(st.code==='closed'||st.code==='done')?'closed-day':'open-later';
     const ta = teamAvg(s.id);
-    const ph = (REVIEWS[s.id]||[]).flatMap(revPhotos).pop();
-    return `<div class="gcell${st.code==='closed'?' closedToday':''}${ph?'':' noPhoto'}" data-id="${s.id}">
-      ${ph?`<img src="${ph}" alt="" loading="lazy">`
-          :`<div class="g-ph" style="background:${CATS[s.cat]}22">${CAT_EMOJI[s.cat]||'🍽'}</div>`}
-      <span class="openbadge g-open ${badgeCls}">${st.label}</span>
-      <div class="g-info">
-        <div class="g-name">${s.name}</div>
-        <div class="g-meta"><span>🚶${s.walk}分</span>${ta?`<span class="gm-star">★${ta.avg.toFixed(1)}</span>`:''}</div>
+    return `<div class="pcard${st.code==='closed'?' closedToday':''}" data-id="${s.id}">
+      <div class="p-head">
+        <span class="c-name">${s.name}</span>
+        <span class="badge" style="background:${CATS[s.cat]}">${s.cat}</span>
+        <span class="openbadge ${badgeCls}">${st.label}</span>
+        <span class="p-meta">🚶${s.walk}分${ta?` <span class="teamstar">★${ta.avg.toFixed(1)}</span>`:''}</span>
       </div>
+      <div class="p-strip">${photos.map(p=>`<img src="${p}" alt="" loading="lazy">`).join('')}</div>
       ${hideBtnHtml()}
     </div>`;
   }).join('');
-  bindListEvents(box, '.gcell');
+  bindListEvents(box, '.pcard');
 }
 
 // 非表示切替ボタン(通常時=非表示にする、非表示リスト表示中=表示に戻す)
@@ -1360,7 +1368,9 @@ function render(){
   badge.hidden = n === 0;
   badge.textContent = n;
   document.getElementById('fbarCount').textContent = list.length;
-  document.getElementById('cards').classList.toggle('gridview', state.view==='grid');
+  document.getElementById('emptyMsg').textContent = state.view==='grid'
+    ? '写真が登録された店がありません。店の記録に写真を付けると、ここに表示されます。'
+    : '条件に合う店がありません。フィルタを緩めてみてください。';
   document.querySelectorAll('#viewToggle button').forEach(b=>b.classList.toggle('on', b.dataset.view===state.view));
   const hb = document.getElementById('hiddenBtn');
   hb.hidden = !HIDDEN.size;
