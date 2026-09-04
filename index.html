@@ -84,6 +84,36 @@
   .closed-day{background:#F9E8E6;color:var(--warn)}
   .empty{padding:40px;text-align:center;color:var(--ink2);font-size:13.5px;background:var(--card);border-radius:14px;border:1px dashed var(--line)}
 
+  /* 画像グリッド表示 */
+  .listhead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .viewtoggle{display:flex;gap:0;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;width:max-content}
+  .viewtoggle button{border:none;background:var(--card);color:var(--ink2);font-size:12.5px;font-weight:700;font-family:inherit;padding:7px 16px;cursor:pointer}
+  .viewtoggle button.on{background:var(--ink);color:#fff}
+  .cards.gridview{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+  .gcell{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;cursor:pointer;border:1px solid var(--line);background:var(--card);transition:.15s}
+  .gcell:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(23,36,45,.12)}
+  .gcell.closedToday{opacity:.55}
+  .gcell img{width:100%;height:100%;object-fit:cover;display:block}
+  .g-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:34px}
+  .g-info{position:absolute;left:0;right:0;bottom:0;padding:18px 8px 7px;background:linear-gradient(transparent,rgba(23,36,45,.78));color:#fff}
+  .gcell.noPhoto .g-info{background:linear-gradient(transparent,rgba(23,36,45,.45))}
+  .g-name{font-size:12.5px;font-weight:800;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .g-meta{font-size:10.5px;font-weight:700;opacity:.92;margin-top:2px;display:flex;gap:8px;font-variant-numeric:tabular-nums}
+  .g-meta .gm-star{color:#FFD666}
+  .g-open{position:absolute;top:6px;right:6px}
+
+  /* 店舗ごとの非表示切替 */
+  .hiddenlistbtn{border:1.5px solid var(--line);background:var(--card);color:var(--ink2);font-size:12.5px;font-weight:700;font-family:inherit;padding:7px 14px;border-radius:10px;cursor:pointer}
+  .hiddenlistbtn b{color:var(--ink)}
+  .hiddenlistbtn.on{background:var(--warn);border-color:var(--warn);color:#fff}
+  .hiddenlistbtn.on b{color:#fff}
+  .hiddenview-note{font-size:12px;color:var(--ink2);background:var(--card);border:1px dashed var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px}
+  .hidebtn{position:absolute;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.88);color:var(--ink2);font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2}
+  .hidebtn:hover{background:#fff;color:var(--ink)}
+  .card .hidebtn{right:10px;bottom:10px}
+  .card.hasThumb .hidebtn{right:10px}
+  .gcell .hidebtn{left:6px;top:6px}
+
   /* modal */
   .overlay{position:fixed;inset:0;background:rgba(23,36,45,.5);z-index:100;display:none;align-items:flex-end;justify-content:center}
   @media(min-width:640px){.overlay{align-items:center}}
@@ -169,6 +199,7 @@
     /* ヘッダー+折りたたみバーを差し引き、初期表示で地図全体が収まる高さ(svh=iOSアドレスバー表示時基準) */
     #lmap{height:calc(100vh - 190px);height:calc(100svh - 190px);min-height:280px;max-height:520px}
     .card{padding:12px 13px}
+    .cards.gridview{grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
     .c-name{font-size:15px}
     .c-meta{font-size:11.5px;gap:5px 10px}
     .m-close{width:40px;height:40px;font-size:18px}
@@ -230,6 +261,14 @@
     <div class="maplegend" id="legend"></div>
   </div>
   <div>
+    <div class="listhead">
+      <div class="viewtoggle" id="viewToggle" role="tablist" aria-label="一覧の表示形式">
+        <button type="button" data-view="list">📋 リスト</button>
+        <button type="button" data-view="grid">🖼 画像</button>
+      </div>
+      <button type="button" class="hiddenlistbtn" id="hiddenBtn" hidden>🚫 非表示 <b id="hiddenNum">0</b>軒</button>
+    </div>
+    <div class="hiddenview-note" id="hiddenNote" hidden>非表示中の店です。↩ をタップすると表示に戻ります。</div>
     <div class="cards" id="cards"></div>
     <div class="empty" id="emptyMsg" style="display:none">条件に合う店がありません。フィルタを緩めてみてください。</div>
   </div>
@@ -740,6 +779,18 @@ const SHOPS = [
 {id:'woodberry', name:'WOODBERRY COFFEE 渋谷店', cat:'カフェ・軽食', lat:35.6536, lng:139.7088, price:2, g:null, gn:null,
  desc:'自家焙煎とブランチの人気カフェ',
  hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960)], hoursText:'毎日 11:00-16:00', pid:''},
+{id:'zonarosa', name:'ZONA ROSA(ソナロッサ)', cat:'アジア・エスニック', lat:35.646660, lng:139.712172, price:2, g:null, gn:null,
+ desc:'メイン選択制+サラダ等ブッフェ付きの老舗メキシカンランチ。ランチ休止中の情報もあり要確認。',
+ hours:[null,D(690,900),D(690,900),D(690,900),null,null,null], hoursText:'火〜木 11:30-15:00/月・金・土はディナーのみ・日休', pid:''},
+{id:'jinruikazoku', name:'人類みな家族 恵比寿本店', cat:'ラーメン・麺', lat:35.6482369, lng:139.7104447, price:2, g:null, gn:null,
+ desc:'看板メニュー「人類みな兄弟」= 柚子香るネオ家系豚骨醤油。土鍋ごはん・海苔食べ放題。',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'無休 11:00-21:00頃(通し営業)', pid:''},
+{id:'hinaitei', name:'恵比寿 比内亭', cat:'定食・和食', lat:35.6477107, lng:139.7119405, price:2, g:null, gn:null,
+ desc:'比内地鶏の親子丼が名物。ご飯おかわり無料。',
+ hours:[D(690,840),D(690,840),D(690,840),D(690,840),D(690,840),null,null], hoursText:'月〜金 11:30-14:00(L.O.13:30)/土日はディナーのみ', pid:''},
+{id:'watarigarasu', name:'キッチン わたりがらす', cat:'定食・和食', lat:35.649492, lng:139.709549, price:2, g:null, gn:null,
+ desc:'無農薬野菜と鉄羽釜ご飯のオーガニック定食。ご飯・味噌汁お代わり無料。',
+ hours:[null,D(690,870),D(690,870),D(690,870),D(690,870),null,null], hoursText:'火〜金 11:30-14:30/土はディナーのみ・月日祝休', pid:''},
 ];
 
 /* ================= 距離・営業時間ユーティリティ ================= */
@@ -1031,7 +1082,18 @@ function importReviews(){
 }
 
 /* ================= フィルタ状態 ================= */
-const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, unvisitedOnly:false, sort:'dist', selected:null};
+const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, unvisitedOnly:false, sort:'dist', view:'list', hiddenView:false, selected:null};
+
+// 店舗ごとの非表示(localStorage永続化)。hiddenView はリロードで通常表示に戻すため保存しない
+const HIDDEN_KEY = 'lunchmap-hidden-v1';
+const HIDDEN = new Set((()=>{ try{ return JSON.parse(localStorage.getItem(HIDDEN_KEY)||'[]'); }catch(e){ return []; } })().filter(id=>SHOPS.some(s=>s.id===id)));
+function saveHidden(){ try{ localStorage.setItem(HIDDEN_KEY, JSON.stringify([...HIDDEN])); }catch(e){} }
+function toggleHidden(id){
+  HIDDEN.has(id) ? HIDDEN.delete(id) : HIDDEN.add(id);
+  saveHidden();
+  if(state.hiddenView && !HIDDEN.size) state.hiddenView = false; // 全店復元したら通常表示へ
+  render();
+}
 
 // 前回の検索条件を復元・保存(localStorage)。selected は保存しない
 const FILTER_KEY = 'lunchmap-filters-v1';
@@ -1045,13 +1107,14 @@ function loadFilterState(){
     if(typeof v.openOnly === 'boolean') state.openOnly = v.openOnly;
     if(typeof v.unvisitedOnly === 'boolean') state.unvisitedOnly = v.unvisitedOnly;
     if(['dist','g','team','stay'].includes(v.sort)) state.sort = v.sort;
+    if(['list','grid'].includes(v.view)) state.view = v.view;
   }catch(e){}
 }
 function saveFilterState(){
   try{
     localStorage.setItem(FILTER_KEY, JSON.stringify({
       cats:[...state.cats], prices:[...state.prices], maxWalk:state.maxWalk,
-      openOnly:state.openOnly, unvisitedOnly:state.unvisitedOnly, sort:state.sort
+      openOnly:state.openOnly, unvisitedOnly:state.unvisitedOnly, sort:state.sort, view:state.view
     }));
   }catch(e){}
 }
@@ -1092,6 +1155,12 @@ function buildChips(){
   ot.onchange=e=>{ state.openOnly=e.target.checked; render(); };
   ut.onchange=e=>{ state.unvisitedOnly=e.target.checked; render(); };
   ss.onchange=e=>{ state.sort=e.target.value; render(); };
+  // リスト/画像の表示切替
+  document.querySelectorAll('#viewToggle button').forEach(b=>{
+    b.onclick=()=>{ state.view=b.dataset.view; render(); };
+  });
+  // 非表示リストの表示切替
+  document.getElementById('hiddenBtn').onclick=()=>{ state.hiddenView=!state.hiddenView; render(); };
 }
 
 // 適用中の絞り込み数(「本日営業」はデフォルトONなので数えない)
@@ -1114,7 +1183,9 @@ function initFilterBar(){
 }
 
 function filtered(){
-  let list = SHOPS.filter(s=>{
+  // 非表示リスト表示中は他のフィルタを適用しない(営業中フィルタ等で復元できない店が出ないように)
+  let list = state.hiddenView ? SHOPS.filter(s=>HIDDEN.has(s.id)) : SHOPS.filter(s=>{
+    if(HIDDEN.has(s.id)) return false;
     if(state.cats.size && !state.cats.has(s.cat)) return false;
     if(state.prices.size && !state.prices.has(s.price)) return false;
     if(state.maxWalk && s.walk > state.maxWalk) return false;
@@ -1236,11 +1307,47 @@ function renderCards(list){
         <span class="gstar">G ${s.g!=null?s.g.toFixed(1):'—'}</span>
         <span class="teamstar">${ta?`自分 ${starStr(ta.avg)} ${ta.avg.toFixed(1)}(${ta.n}回)`:'メモなし'}</span>
       </div>
+      ${hideBtnHtml()}
     </div>`;
   }).join('');
-  box.querySelectorAll('.card').forEach(el=>{
+  bindListEvents(box, '.card');
+}
+
+// 画像ベース一覧。写真は自分のレビュー写真の最新1枚、なければカテゴリ色プレースホルダ
+const CAT_EMOJI = {'定食・和食':'🍱','ラーメン・麺':'🍜','そば・うどん':'🥢','カレー':'🍛','中華':'🥟','寿司・海鮮':'🍣','肉・揚げ物':'🍖','アジア・エスニック':'🌶','バーガー・サンド':'🍔','イタリアン・洋食':'🍝','カフェ・軽食':'☕','弁当・テイクアウト':'🍙'};
+function renderGrid(list){
+  const box = document.getElementById('cards');
+  document.getElementById('emptyMsg').style.display = list.length?'none':'block';
+  box.innerHTML = list.map(s=>{
+    const st = openState(s);
+    const badgeCls = st.code==='now'?'open-now':(st.code==='closed'||st.code==='done')?'closed-day':'open-later';
+    const ta = teamAvg(s.id);
+    const ph = (REVIEWS[s.id]||[]).flatMap(revPhotos).pop();
+    return `<div class="gcell${st.code==='closed'?' closedToday':''}${ph?'':' noPhoto'}" data-id="${s.id}">
+      ${ph?`<img src="${ph}" alt="" loading="lazy">`
+          :`<div class="g-ph" style="background:${CATS[s.cat]}22">${CAT_EMOJI[s.cat]||'🍽'}</div>`}
+      <span class="openbadge g-open ${badgeCls}">${st.label}</span>
+      <div class="g-info">
+        <div class="g-name">${s.name}</div>
+        <div class="g-meta"><span>🚶${s.walk}分</span>${ta?`<span class="gm-star">★${ta.avg.toFixed(1)}</span>`:''}</div>
+      </div>
+      ${hideBtnHtml()}
+    </div>`;
+  }).join('');
+  bindListEvents(box, '.gcell');
+}
+
+// 非表示切替ボタン(通常時=非表示にする、非表示リスト表示中=表示に戻す)
+function hideBtnHtml(){
+  return state.hiddenView
+    ? `<button type="button" class="hidebtn" title="表示に戻す" aria-label="表示に戻す">↩</button>`
+    : `<button type="button" class="hidebtn" title="この店を非表示にする" aria-label="この店を非表示にする">🚫</button>`;
+}
+function bindListEvents(box, sel){
+  box.querySelectorAll(sel).forEach(el=>{
     el.addEventListener('click',()=>openModal(el.dataset.id));
     el.addEventListener('mouseenter',()=>{ state.selected=el.dataset.id; drawMap(filtered()); });
+    el.querySelector('.hidebtn').addEventListener('click',e=>{ e.stopPropagation(); toggleHidden(el.dataset.id); });
   });
 }
 
@@ -1253,7 +1360,14 @@ function render(){
   badge.hidden = n === 0;
   badge.textContent = n;
   document.getElementById('fbarCount').textContent = list.length;
-  renderCards(list);
+  document.getElementById('cards').classList.toggle('gridview', state.view==='grid');
+  document.querySelectorAll('#viewToggle button').forEach(b=>b.classList.toggle('on', b.dataset.view===state.view));
+  const hb = document.getElementById('hiddenBtn');
+  hb.hidden = !HIDDEN.size;
+  hb.classList.toggle('on', state.hiddenView);
+  document.getElementById('hiddenNum').textContent = HIDDEN.size;
+  document.getElementById('hiddenNote').hidden = !state.hiddenView;
+  state.view==='grid' ? renderGrid(list) : renderCards(list);
   drawMap(list);
 }
 
