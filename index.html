@@ -559,6 +559,187 @@ const SHOPS = [
 {id:'unatetsu', name:'うな鉄 恵比寿本店', cat:'定食・和食', lat:35.6461323, lng:139.708856, price:4, g:4.2, gn:541,
  desc:'ひつまぶし・蒲焼の有名店。通し営業なので時間をずらしてゆっくり贅沢ランチ。',
  hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00〜(通し営業)', pid:'ChIJufFx9kCLGGARtqKLwDFgygE'},
+// ===== 追加掲載(2026-09 拡充) =====
+{id:'areverie', name:'Areverie TERRACE ebisu', cat:'カフェ・軽食', lat:35.650248, lng:139.712534, price:2, g:null, gn:null,
+ desc:'タワー1Fのカフェダイニング。ペット可',
+ hours:[D(690,840),D(690,840),D(690,840),D(690,840),D(690,840),D(690,840),D(690,840)], hoursText:'毎日 11:30-14:00', pid:''},
+{id:'segafredo', name:'セガフレード・ザネッティ 恵比寿プライムスクエア店', cat:'カフェ・軽食', lat:35.650118, lng:139.712608, price:2, g:null, gn:null,
+ desc:'タワー1Fのイタリアンバール。平日のみ',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),null,null], hoursText:'月〜金 11:00-15:00/土・日休', pid:''},
+{id:'tsukumo', name:'九十九ラーメン 恵比寿本店', cat:'ラーメン・麺', lat:35.649882, lng:139.712052, price:1, g:null, gn:null,
+ desc:'元祖チーズ味噌豚骨。渋谷橋交差点すぐ',
+ hours:[D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),D(660,930)], hoursText:'毎日 11:00-15:30', pid:''},
+{id:'ippudo', name:'博多 一風堂 恵比寿店', cat:'ラーメン・麺', lat:35.648661, lng:139.713247, price:2, g:null, gn:null,
+ desc:'博多豚骨の定番チェーン。白丸・赤丸',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'coci', name:'coci', cat:'アジア・エスニック', lat:35.648857, lng:139.710815, price:2, g:null, gn:null,
+ desc:'渋谷川沿いのタイ料理ビストロ',
+ hours:[D(690,960),D(690,960),D(690,960),D(690,960),D(690,960),D(690,960),D(690,960)], hoursText:'毎日 11:30-16:00', pid:''},
+{id:'fukami', name:'カウンター焼肉 ふかみ', cat:'肉・揚げ物', lat:35.648628, lng:139.71108, price:3, g:null, gn:null,
+ desc:'カウンターで一人焼肉ランチ',
+ hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960)], hoursText:'毎日 11:00-16:00', pid:''},
+{id:'tacos3', name:'Tacos 3 Hermanos Ebisu', cat:'アジア・エスニック', lat:35.64853, lng:139.711086, price:3, g:null, gn:null,
+ desc:'本格メキシカンタコスの専門店',
+ hours:[null,D(660,930),D(660,930),D(660,930),D(660,930),D(660,930),D(660,930)], hoursText:'火〜日 11:00-15:30/月休', pid:''},
+{id:'yamacho', name:'うどん山長 恵比寿本店', cat:'そば・うどん', lat:35.6483, lng:139.711124, price:2, g:null, gn:null,
+ desc:'鰹節問屋の出汁香るうどん百名店',
+ hours:[D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930),D(690,930)], hoursText:'毎日 11:30-15:30', pid:''},
+{id:'bluepapaya', name:'ブルーパパイアタイランド 恵比寿店', cat:'アジア・エスニック', lat:35.648734, lng:139.710522, price:2, g:null, gn:null,
+ desc:'ランチビュッフェもある本格タイ料理',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,930),D(690,930)], hoursText:'月〜金 11:30-15:00、土〜日 11:30-15:30', pid:''},
+{id:'miharu', name:'瞠 恵比寿店', cat:'ラーメン・麺', lat:35.647991, lng:139.711655, price:2, g:null, gn:null,
+ desc:'油そばと魚介豚骨つけ麺の実力店',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),null], hoursText:'月〜土 11:00-15:00/日休', pid:''},
+{id:'afuri', name:'AFURI 恵比寿', cat:'ラーメン・麺', lat:35.648293, lng:139.710876, price:2, g:null, gn:null,
+ desc:'柚子塩ラーメンの淡麗系名店',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'issairyuka', name:'溢彩流香 餃子小厨 恵比寿', cat:'中華', lat:35.64915, lng:139.70987, price:2, g:null, gn:null,
+ desc:'手包み餃子専門の中華',
+ hours:[D(690,900),null,null,D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'月 11:30-15:00、木〜日 11:30-15:00/火・水休', pid:''},
+{id:'papascafe', name:'パパスカフェ 広尾店', cat:'カフェ・軽食', lat:35.652322, lng:139.713488, price:2, g:null, gn:null,
+ desc:'カレーやホットサンドの静かなカフェ',
+ hours:[null,D(660,900),D(660,900),D(660,900),D(660,900),null,null], hoursText:'火〜金 11:00-15:00/月・土・日休', pid:''},
+{id:'uncletom', name:'アンクルトム', cat:'イタリアン・洋食', lat:35.647658, lng:139.711824, price:2, g:null, gn:null,
+ desc:'ハシヤ系スパゲッティ老舗、71種',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(705,890),null], hoursText:'月〜金 11:30-14:30、土 11:45-14:50/日休', pid:''},
+{id:'uokuni', name:'魚国寿司', cat:'寿司・海鮮', lat:35.649796, lng:139.709381, price:1, g:null, gn:null,
+ desc:'にぎり950円の昭和町寿司',
+ hours:[D(690,810),D(690,810),D(690,810),D(690,810),D(690,810),null,D(690,810)], hoursText:'月〜金 11:30-13:30、日 11:30-13:30/土休', pid:''},
+{id:'turbo80', name:'ターボー80', cat:'イタリアン・洋食', lat:35.651615, lng:139.709763, price:2, g:null, gn:null,
+ desc:'パスタ人気の老舗洋食、売切注意',
+ hours:[D(690,930),D(660,930),D(660,930),D(660,930),D(660,930),null,null], hoursText:'月 11:30-15:30、火〜金 11:00-15:30/土・日休', pid:''},
+{id:'yellowcompany', name:'イエローカンパニー 恵比寿本店', cat:'カレー', lat:35.651443, lng:139.709503, price:2, g:null, gn:null,
+ desc:'百名店の札幌スープカレー',
+ hours:[D(690,960),null,D(690,960),D(690,960),D(690,960),D(690,960),D(690,960)], hoursText:'月 11:30-16:00、水〜日 11:30-16:00/火休', pid:''},
+{id:'nomad', name:'nomad', cat:'イタリアン・洋食', lat:35.650463, lng:139.709015, price:2, g:null, gn:null,
+ desc:'隠れ家イタリアンのパスタランチ',
+ hours:[null,D(720,870),D(720,870),D(720,870),D(720,870),D(720,870),null], hoursText:'火〜土 12:00-14:30/月・日休', pid:''},
+{id:'laesquina', name:'ラ エスキーナ', cat:'アジア・エスニック', lat:35.647205, lng:139.712018, price:2, g:4, gn:278,
+ desc:'自家製トルティーヤのクラフトタコス',
+ hours:[D(705,900),D(705,900),D(705,900),D(705,900),D(705,900),D(720,900),null], hoursText:'月〜金 11:45-15:00、土 12:00-15:00/日休', pid:''},
+{id:'fujisoba', name:'名代 富士そば 恵比寿駅前店', cat:'そば・うどん', lat:35.648029, lng:139.709869, price:1, g:null, gn:null,
+ desc:'早朝から深夜まで、さっと立ちそば',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'ebisuhanten', name:'えびす飯店', cat:'中華', lat:35.648312, lng:139.710373, price:1, g:null, gn:null,
+ desc:'東口すぐの町中華、スタミナ焼肉飯',
+ hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,840)], hoursText:'月〜土 11:00-16:00、日 11:00-14:00', pid:''},
+{id:'taihoki', name:'恵比寿餃子 大豊記 本館', cat:'中華', lat:35.648673, lng:139.710006, price:2, g:null, gn:null,
+ desc:'特大の名物恵比寿餃子と中華定食',
+ hours:[D(705,885),D(705,885),D(705,885),D(705,885),D(705,885),D(705,885),D(705,885)], hoursText:'毎日 11:45-14:45', pid:''},
+{id:'dandadan', name:'肉汁餃子のダンダダン 恵比寿店', cat:'中華', lat:35.647888, lng:139.710892, price:1, g:null, gn:null,
+ desc:'肉汁餃子定食、昼は千円以下',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'毎日 11:30-15:00', pid:''},
+{id:'fraukrumm', name:'FRAU KRUMM BREAD & COFFEE', cat:'カフェ・軽食', lat:35.647821, lng:139.71459, price:1, g:null, gn:null,
+ desc:'伊達公子プロデュースのドイツパンカフェ',
+ hours:[D(510,960),D(510,960),D(510,960),D(510,960),D(510,960),D(540,960),null], hoursText:'月〜金 8:30-16:00、土 9:00-16:00/日休', pid:''},
+{id:'sugary', name:'SUGARY 恵比寿店', cat:'カフェ・軽食', lat:35.64875, lng:139.709396, price:2, g:null, gn:null,
+ desc:'アサイーボウル専門カフェ',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'tofushokudo', name:'豆富食堂', cat:'定食・和食', lat:35.649117, lng:139.708557, price:2, g:null, gn:null,
+ desc:'工房併設の手作り豆腐御膳',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870)], hoursText:'毎日 11:30-14:30', pid:''},
+{id:'kadota', name:'炭焼き かどた', cat:'定食・和食', lat:35.647938, lng:139.709122, price:2, g:null, gn:null,
+ desc:'行列の絶品焼き魚定食',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),null], hoursText:'月〜土 11:00-15:00/日休', pid:''},
+{id:'kainan', name:'海南鶏飯食堂2 恵比寿店', cat:'アジア・エスニック', lat:35.646785, lng:139.714235, price:2, g:null, gn:null,
+ desc:'シンガポールチキンライス専門店',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(660,900),D(660,900)], hoursText:'月〜金 11:30-14:30、土〜日 11:00-15:00', pid:''},
+{id:'piccia', name:'PICCIA PICCIA PIZZA & PASTA', cat:'イタリアン・洋食', lat:35.647584, lng:139.714973, price:2, g:null, gn:null,
+ desc:'薪窯ピザの「呑めるピザ屋」',
+ hours:[D(690,900),null,D(690,900),D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'月 11:30-15:00、水〜日 11:30-15:00/火休', pid:''},
+{id:'ayakawa', name:'手打 親鶏中華そば 綾川 恵比寿本店', cat:'ラーメン・麺', lat:35.646605, lng:139.713662, price:1, g:null, gn:null,
+ desc:'親鶏スープと青竹手打ち麺の行列店',
+ hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960)], hoursText:'毎日 11:00-16:00', pid:''},
+{id:'kagawaippuku', name:'香川一福 恵比寿店', cat:'そば・うどん', lat:35.648289, lng:139.70874, price:1, g:null, gn:null,
+ desc:'ミシュラン系譜の讃岐うどん',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'mon', name:'門', cat:'寿司・海鮮', lat:35.646484, lng:139.711838, price:2, g:null, gn:null,
+ desc:'産直鮮魚の定食、刺身付きが評判',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870)], hoursText:'毎日 11:30-14:30', pid:''},
+{id:'tantotanto', name:'タント タント オステリア アトレ恵比寿', cat:'イタリアン・洋食', lat:35.64705, lng:139.7096, price:2, g:null, gn:null,
+ desc:'サラダ・デリ付きパスタランチ',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'taps', name:'TAPS BY YEBISU', cat:'カフェ・軽食', lat:35.647175, lng:139.709305, price:2, g:null, gn:null,
+ desc:'駅ナカのヱビスビアバー、カレー等',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'awkitchen', name:'AWkitchen アトレ恵比寿店', cat:'イタリアン・洋食', lat:35.6471, lng:139.7094, price:2, g:null, gn:null,
+ desc:'サラダバー付きパスタランチ',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'kamurio', name:'らぁめん冠尾', cat:'ラーメン・麺', lat:35.647861, lng:139.708511, price:1, g:null, gn:null,
+ desc:'無化調の鶏白湯・鶏清湯',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'毎日 11:30-15:00', pid:''},
+{id:'komeraku', name:'こめらく アトレ恵比寿店', cat:'定食・和食', lat:35.64685, lng:139.70965, price:2, g:null, gn:null,
+ desc:'出汁茶漬け専門、丼を二度楽しむ',
+ hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960)], hoursText:'毎日 11:00-16:00', pid:''},
+{id:'saizeriya', name:'サイゼリヤ 恵比寿駅東口店', cat:'イタリアン・洋食', lat:35.646194, lng:139.711212, price:1, g:null, gn:null,
+ desc:'東口すぐ、ワンコインで済む洋食',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'suragan', name:'水剌間 恵比寿本店', cat:'アジア・エスニック', lat:35.646194, lng:139.711212, price:2, g:null, gn:null,
+ desc:'宮廷韓国料理の駅前ランチ',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870)], hoursText:'毎日 11:30-14:30', pid:''},
+{id:'mangotree', name:'マンゴツリーカフェ 恵比寿', cat:'アジア・エスニック', lat:35.6469, lng:139.7095, price:2, g:null, gn:null,
+ desc:'アトレ6Fのタイ料理カフェ、ガパオ',
+ hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960)], hoursText:'毎日 11:00-16:00', pid:''},
+{id:'anticocafe', name:'アンティコカフェ アルアビス アトレ恵比寿店', cat:'カフェ・軽食', lat:35.6471, lng:139.7092, price:1, g:null, gn:null,
+ desc:'イタリアンバール、パニーニが手軽',
+ hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960)], hoursText:'毎日 11:00-16:00', pid:''},
+{id:'mumbai', name:'ムンバイダイニング アトレ恵比寿店', cat:'カレー', lat:35.64695, lng:139.7094, price:2, g:null, gn:null,
+ desc:'駅ビルで本格インドカレーとナン',
+ hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960)], hoursText:'毎日 11:00-16:00', pid:''},
+{id:'ohashi', name:'小割烹おはし 恵比寿', cat:'定食・和食', lat:35.647, lng:139.7093, price:2, g:null, gn:null,
+ desc:'京おばんざいと羽釜ご飯の和定食',
+ hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960)], hoursText:'毎日 11:00-16:00', pid:''},
+{id:'tsurukame', name:'つるかめ 恵比寿', cat:'ラーメン・麺', lat:35.646034, lng:139.713226, price:2, g:null, gn:null,
+ desc:'手包み餃子と中華そばの店',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'毎日 11:30-15:00', pid:''},
+{id:'orenosteak', name:'俺のステーキ 恵比寿', cat:'肉・揚げ物', lat:35.647968, lng:139.708389, price:3, g:null, gn:null,
+ desc:'2025年11月開店、黒毛和牛ステーキ',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900)], hoursText:'毎日 11:30-15:00', pid:''},
+{id:'jindinrou', name:'京鼎樓 HANARE', cat:'中華', lat:35.646194, lng:139.711212, price:2, g:null, gn:null,
+ desc:'台湾小籠包の名店、麺飯セットも充実',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(660,900),D(660,900)], hoursText:'月〜金 11:30-15:00、土〜日 11:00-15:00', pid:''},
+{id:'sushiebis', name:'スシエビス 恵比寿本店', cat:'寿司・海鮮', lat:35.64599, lng:139.71328, price:2, g:null, gn:null,
+ desc:'寿司居酒屋の昼すし・海鮮丼',
+ hours:[D(720,840),D(720,840),D(720,840),D(720,840),D(720,840),D(720,840),D(720,840)], hoursText:'毎日 12:00-14:00', pid:''},
+{id:'rambo', name:'新鮮焼肉ランボー', cat:'肉・揚げ物', lat:35.645962, lng:139.713715, price:2, g:null, gn:null,
+ desc:'焼肉ランチはご飯お替り自由',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870)], hoursText:'毎日 11:30-14:30', pid:''},
+{id:'sorano', name:'豆腐料理 空野 恵比寿店', cat:'定食・和食', lat:35.645847, lng:139.713043, price:2, g:null, gn:null,
+ desc:'自家製豆腐づくしの和定食',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870)], hoursText:'毎日 11:30-14:30', pid:''},
+{id:'blacows', name:'ブラッカウズ', cat:'バーガー・サンド', lat:35.649418, lng:139.707108, price:3, g:null, gn:null,
+ desc:'ミート矢澤の黒毛和牛バーガー',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'yakinikuao', name:'yakiniku ao', cat:'肉・揚げ物', lat:35.6533, lng:139.70852, price:2, g:null, gn:null,
+ desc:'A5和牛焼肉ランチとカレー',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),null], hoursText:'月〜土 11:30-14:30/日休', pid:''},
+{id:'moris', name:'kitchen&bar MORIS', cat:'カフェ・軽食', lat:35.653568, lng:139.708786, price:1, g:null, gn:null,
+ desc:'看板猫のいるタコライス専門',
+ hours:[D(690,870),D(690,870),D(690,870),D(690,870),D(690,870),null,null], hoursText:'月〜金 11:30-14:30/土・日休', pid:''},
+{id:'fumies', name:'フミーズ・グリル', cat:'イタリアン・洋食', lat:35.647963, lng:139.717674, price:2, g:null, gn:null,
+ desc:'老舗ビストロの平日洋食ランチ',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),null,null], hoursText:'月〜金 11:30-15:00/土・日休', pid:''},
+{id:'saltymode', name:'ソルティーモード', cat:'アジア・エスニック', lat:35.64925, lng:139.70755, price:2, g:null, gn:null,
+ desc:'老舗ネパールのダルバート',
+ hours:[null,D(705,840),D(705,840),D(705,840),D(705,840),null,null], hoursText:'火〜金 11:45-14:00/月・土・日休', pid:''},
+{id:'mushroom', name:'マッシュルーム', cat:'イタリアン・洋食', lat:35.648708, lng:139.707474, price:4, g:null, gn:null,
+ desc:'きのこ尽くしの老舗フレンチ',
+ hours:[null,D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900)], hoursText:'火〜日 12:00-15:00/月休', pid:''},
+{id:'beerhall', name:'恵比壽ビヤホール', cat:'イタリアン・洋食', lat:35.646709, lng:139.709045, price:2, g:null, gn:null,
+ desc:'ヱビス直営ビアホールの洋食ランチ',
+ hours:[D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900),D(720,900)], hoursText:'毎日 12:00-15:00', pid:''},
+{id:'oozeki', name:'おおぜき中華そば店', cat:'ラーメン・麺', lat:35.647099, lng:139.708496, price:1, g:3.8, gn:102,
+ desc:'行列必至の煮干し中華そば',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,840)], hoursText:'月〜土 11:00-15:00、日 11:00-14:00', pid:''},
+{id:'shogetsuan', name:'松月庵', cat:'そば・うどん', lat:35.653378, lng:139.708633, price:1, g:null, gn:null,
+ desc:'昔ながらの町蕎麦、昼千円以下',
+ hours:[D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),D(690,900),null], hoursText:'月〜土 11:30-15:00/日休', pid:''},
+{id:'ebiyama', name:'海老山', cat:'肉・揚げ物', lat:35.653339, lng:139.708466, price:2, g:null, gn:null,
+ desc:'肉山系列の海老かつ丼専門',
+ hours:[D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'毎日 11:00-15:00', pid:''},
+{id:'woodberry', name:'WOODBERRY COFFEE 渋谷店', cat:'カフェ・軽食', lat:35.6536, lng:139.7088, price:2, g:null, gn:null,
+ desc:'自家焙煎とブランチの人気カフェ',
+ hours:[D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960),D(660,960)], hoursText:'毎日 11:00-16:00', pid:''},
 ];
 
 /* ================= 距離・営業時間ユーティリティ ================= */
@@ -852,11 +1033,36 @@ function importReviews(){
 /* ================= フィルタ状態 ================= */
 const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, unvisitedOnly:false, sort:'dist', selected:null};
 
+// 前回の検索条件を復元・保存(localStorage)。selected は保存しない
+const FILTER_KEY = 'lunchmap-filters-v1';
+function loadFilterState(){
+  try{
+    const v = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null');
+    if(!v) return;
+    (v.cats||[]).forEach(c=>{ if(CATS[c]) state.cats.add(c); });
+    (v.prices||[]).forEach(p=>{ if(PRICES[p]) state.prices.add(+p); });
+    if([3,5,7,10].includes(v.maxWalk)) state.maxWalk = v.maxWalk;
+    if(typeof v.openOnly === 'boolean') state.openOnly = v.openOnly;
+    if(typeof v.unvisitedOnly === 'boolean') state.unvisitedOnly = v.unvisitedOnly;
+    if(['dist','g','team','stay'].includes(v.sort)) state.sort = v.sort;
+  }catch(e){}
+}
+function saveFilterState(){
+  try{
+    localStorage.setItem(FILTER_KEY, JSON.stringify({
+      cats:[...state.cats], prices:[...state.prices], maxWalk:state.maxWalk,
+      openOnly:state.openOnly, unvisitedOnly:state.unvisitedOnly, sort:state.sort
+    }));
+  }catch(e){}
+}
+
 function buildChips(){
+  loadFilterState();
   const cc = document.getElementById('catChips');
   Object.entries(CATS).forEach(([cat,color])=>{
     const b=document.createElement('button');
     b.className='chip'; b.innerHTML=`<span class="dot" style="background:${color}"></span>${cat}`;
+    b.classList.toggle('on', state.cats.has(cat));
     b.onclick=()=>{ state.cats.has(cat)?state.cats.delete(cat):state.cats.add(cat); b.classList.toggle('on'); render(); };
     cc.appendChild(b);
   });
@@ -864,6 +1070,7 @@ function buildChips(){
   Object.entries(PRICES).forEach(([p,label])=>{
     const b=document.createElement('button');
     b.className='chip'; b.textContent=label;
+    b.classList.toggle('on', state.prices.has(+p));
     b.onclick=()=>{ const k=+p; state.prices.has(k)?state.prices.delete(k):state.prices.add(k); b.classList.toggle('on'); render(); };
     pc.appendChild(b);
   });
@@ -872,6 +1079,7 @@ function buildChips(){
   [[3,'徒歩3分以内'],[5,'徒歩5分以内'],[7,'徒歩7分以内'],[10,'徒歩10分以内']].forEach(([min,label])=>{
     const b=document.createElement('button');
     b.className='chip'; b.textContent=label; b.dataset.min=min;
+    b.classList.toggle('on', state.maxWalk===min);
     b.onclick=()=>{
       state.maxWalk = (state.maxWalk===min) ? null : min;
       wc.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on', +x.dataset.min===state.maxWalk));
@@ -879,9 +1087,11 @@ function buildChips(){
     };
     wc.appendChild(b);
   });
-  document.getElementById('openToggle').onchange=e=>{ state.openOnly=e.target.checked; render(); };
-  document.getElementById('unvisitedToggle').onchange=e=>{ state.unvisitedOnly=e.target.checked; render(); };
-  document.getElementById('sortSel').onchange=e=>{ state.sort=e.target.value; render(); };
+  const ot = document.getElementById('openToggle'), ut = document.getElementById('unvisitedToggle'), ss = document.getElementById('sortSel');
+  ot.checked = state.openOnly; ut.checked = state.unvisitedOnly; ss.value = state.sort;
+  ot.onchange=e=>{ state.openOnly=e.target.checked; render(); };
+  ut.onchange=e=>{ state.unvisitedOnly=e.target.checked; render(); };
+  ss.onchange=e=>{ state.sort=e.target.value; render(); };
 }
 
 // 適用中の絞り込み数(「本日営業」はデフォルトONなので数えない)
@@ -915,7 +1125,7 @@ function filtered(){
   const key = state.sort;
   list.sort((a,b)=>{
     if(key==='dist') return a.dist-b.dist;
-    if(key==='g') return b.g-a.g;
+    if(key==='g') return (b.g||0)-(a.g||0);
     if(key==='stay') return b.stay-a.stay;
     if(key==='team'){
       const ta=teamAvg(a.id), tb=teamAvg(b.id);
@@ -1023,7 +1233,7 @@ function renderCards(list){
       <div class="c-meta">
         <span class="meta-item">🚶 徒歩 <b>${s.walk}分</b></span>
         <span class="meta-item ${stayCls}">⏱ 滞在可能 約<b>${s.stay}分</b></span>
-        <span class="gstar">G ${s.g.toFixed(1)}</span>
+        <span class="gstar">G ${s.g!=null?s.g.toFixed(1):'—'}</span>
         <span class="teamstar">${ta?`自分 ${starStr(ta.avg)} ${ta.avg.toFixed(1)}(${ta.n}回)`:'メモなし'}</span>
       </div>
     </div>`;
@@ -1035,6 +1245,7 @@ function renderCards(list){
 }
 
 function render(){
+  saveFilterState();
   const list = filtered();
   document.getElementById('countNum').textContent = list.length;
   const n = activeFilterCount();
@@ -1054,7 +1265,7 @@ function openModal(id){
   const st = openState(s);
   const ta = teamAvg(id);
   const revs = (REVIEWS[id]||[]).slice().reverse();
-  const gm = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name+' 恵比寿')}&query_place_id=${s.pid}`;
+  const gm = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name+' 恵比寿')}${s.pid?`&query_place_id=${s.pid}`:''}`;
   const gi = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(s.name+' 恵比寿 ランチ メニュー')}`;
   const ps = paidStats(id);
   pickStars = 0;
@@ -1070,7 +1281,7 @@ function openModal(id){
       <div class="m-cell">昼休み60分での滞在目安<b>約${s.stay}分</b></div>
       <div class="m-cell">営業時間<b style="font-size:12.5px">${s.hoursText}</b></div>
       <div class="m-cell">現在<b>${st.label}</b></div>
-      <div class="m-cell">Google評価<b>★${s.g.toFixed(1)}(${s.gn}件)</b></div>
+      <div class="m-cell">Google評価<b>${s.g!=null?`★${s.g.toFixed(1)}(${s.gn}件)`:'未取得'}</b></div>
     </div>
     <a class="m-link" href="${gm}" target="_blank" rel="noopener">Google Mapsで経路・店の写真を見る →</a><br>
     <a class="m-link" href="${gi}" target="_blank" rel="noopener">メニュー・料理の画像を検索 →</a>
@@ -1147,6 +1358,7 @@ function loadGmaps(){
   return gmapsReady;
 }
 async function loadPlacePhotos(s){
+  if(!s.pid) return null;
   if(PHOTO_CACHE[s.id]) return PHOTO_CACHE[s.id];
   const ready = loadGmaps();
   if(!ready) return null;
