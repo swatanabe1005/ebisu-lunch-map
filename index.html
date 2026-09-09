@@ -106,12 +106,17 @@
   .hiddenlistbtn b{color:var(--ink)}
   .hiddenlistbtn.on{background:var(--warn);border-color:var(--warn);color:#fff}
   .hiddenlistbtn.on b{color:#fff}
+  #favBtn.on{background:#e0245e;border-color:#e0245e}
   .hiddenview-note{font-size:12px;color:var(--ink2);background:var(--card);border:1px dashed var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px}
   .hidebtn{position:absolute;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.88);color:var(--ink2);font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2}
   .hidebtn:hover{background:#fff;color:var(--ink)}
   .card .hidebtn{right:10px;bottom:10px}
   .card.hasThumb .hidebtn{right:10px}
   .pcard .hidebtn{right:10px;top:10px}
+  .card .favbtn{right:44px;bottom:10px}
+  .card.hasThumb .favbtn{right:44px}
+  .pcard .favbtn{right:44px;top:10px}
+  .favbtn.on{color:#e0245e;border-color:#e0245e}
 
   /* modal */
   .overlay{position:fixed;inset:0;background:rgba(23,36,45,.5);z-index:100;display:none;align-items:flex-end;justify-content:center}
@@ -267,8 +272,10 @@
         <button type="button" data-view="grid">🖼 画像</button>
       </div>
       <button type="button" class="hiddenlistbtn" id="hiddenBtn" hidden>🚫 非表示 <b id="hiddenNum">0</b>軒</button>
+      <button type="button" class="hiddenlistbtn" id="favBtn" hidden>❤ お気に入り <b id="favNum">0</b>軒</button>
     </div>
     <div class="hiddenview-note" id="hiddenNote" hidden>非表示中の店です。↩ をタップすると表示に戻ります。</div>
+    <div class="hiddenview-note" id="favNote" hidden>お気に入りの店です。❤ をタップすると解除できます。</div>
     <div class="cards" id="cards"></div>
     <div class="empty" id="emptyMsg" style="display:none">条件に合う店がありません。フィルタを緩めてみてください。</div>
   </div>
@@ -1856,7 +1863,7 @@ function importReviews(){
 }
 
 /* ================= フィルタ状態 ================= */
-const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, unvisitedOnly:false, sort:'dist', view:'list', hiddenView:false, q:'', selected:null};
+const state = {cats:new Set(), prices:new Set(), maxWalk:null, openOnly:true, unvisitedOnly:false, sort:'dist', view:'list', hiddenView:false, favView:false, q:'', selected:null};
 
 // 検索用の文字正規化(小文字化+カタカナ→ひらがな+空白除去)
 function normText(t){
@@ -1871,6 +1878,17 @@ function toggleHidden(id){
   HIDDEN.has(id) ? HIDDEN.delete(id) : HIDDEN.add(id);
   saveHidden();
   if(state.hiddenView && !HIDDEN.size) state.hiddenView = false; // 全店復元したら通常表示へ
+  render();
+}
+
+// 店舗ごとのお気に入り(localStorage永続化)。favView はリロードで通常表示に戻すため保存しない
+const FAVS_KEY = 'lunchmap-favs-v1';
+const FAVS = new Set((()=>{ try{ return JSON.parse(localStorage.getItem(FAVS_KEY)||'[]'); }catch(e){ return []; } })().filter(id=>SHOPS.some(s=>s.id===id)));
+function saveFavs(){ try{ localStorage.setItem(FAVS_KEY, JSON.stringify([...FAVS])); }catch(e){} }
+function toggleFav(id){
+  FAVS.has(id) ? FAVS.delete(id) : FAVS.add(id);
+  saveFavs();
+  if(state.favView && !FAVS.size) state.favView = false; // 全解除したら通常表示へ
   render();
 }
 
@@ -1938,8 +1956,10 @@ function buildChips(){
   document.querySelectorAll('#viewToggle button').forEach(b=>{
     b.onclick=()=>{ state.view=b.dataset.view; render(); };
   });
-  // 非表示リストの表示切替
-  document.getElementById('hiddenBtn').onclick=()=>{ state.hiddenView=!state.hiddenView; render(); };
+  // 非表示リストの表示切替(お気に入りリスト表示とは排他)
+  document.getElementById('hiddenBtn').onclick=()=>{ state.hiddenView=!state.hiddenView; if(state.hiddenView) state.favView=false; render(); };
+  // お気に入りリストの表示切替(非表示リスト表示とは排他)
+  document.getElementById('favBtn').onclick=()=>{ state.favView=!state.favView; if(state.favView) state.hiddenView=false; render(); };
   // 検索(入力のたびに絞り込み)
   document.getElementById('searchBox').oninput=e=>{ state.q=e.target.value; render(); };
 }
@@ -1966,7 +1986,9 @@ function initFilterBar(){
 function filtered(){
   // 非表示リスト表示中は他のフィルタを適用しない(営業中フィルタ等で復元できない店が出ないように)
   const q = normText(state.q);
-  let list = state.hiddenView ? SHOPS.filter(s=>HIDDEN.has(s.id)) : SHOPS.filter(s=>{
+  let list = state.hiddenView ? SHOPS.filter(s=>HIDDEN.has(s.id))
+    : state.favView ? SHOPS.filter(s=>FAVS.has(s.id) && !HIDDEN.has(s.id))
+    : SHOPS.filter(s=>{
     if(HIDDEN.has(s.id)) return false;
     if(q && !normText(s.name+s.cat+s.desc).includes(q)) return false;
     if(state.cats.size && !state.cats.has(s.cat)) return false;
@@ -2090,6 +2112,7 @@ function renderCards(list){
         <span class="gstar">G ${s.g!=null?s.g.toFixed(1):'—'}</span>
         <span class="teamstar">${ta?`自分 ${starStr(ta.avg)} ${ta.avg.toFixed(1)}(${ta.n}回)`:'メモなし'}</span>
       </div>
+      ${favBtnHtml(s.id)}
       ${hideBtnHtml()}
     </div>`;
   }).join('');
@@ -2113,6 +2136,7 @@ function renderGrid(list){
         <span class="p-meta">🚶${s.walk}分${ta?` <span class="teamstar">★${ta.avg.toFixed(1)}</span>`:''}</span>
       </div>
       <div class="p-strip">${photos.map(p=>`<img src="${p}" alt="" loading="lazy">`).join('')}</div>
+      ${favBtnHtml(s.id)}
       ${hideBtnHtml()}
     </div>`;
   }).join('');
@@ -2125,11 +2149,19 @@ function hideBtnHtml(){
     ? `<button type="button" class="hidebtn" title="表示に戻す" aria-label="表示に戻す">↩</button>`
     : `<button type="button" class="hidebtn" title="この店を非表示にする" aria-label="この店を非表示にする">🚫</button>`;
 }
+// お気に入り切替ボタン。非表示リスト表示中は出さない(↩のみでの表示に戻す操作を優先)
+function favBtnHtml(id){
+  if(state.hiddenView) return '';
+  const on = FAVS.has(id);
+  return `<button type="button" class="hidebtn favbtn${on?' on':''}" title="${on?'お気に入りから外す':'お気に入りに追加'}" aria-label="${on?'お気に入りから外す':'お気に入りに追加'}">${on?'❤':'♡'}</button>`;
+}
 function bindListEvents(box, sel){
   box.querySelectorAll(sel).forEach(el=>{
     el.addEventListener('click',()=>openModal(el.dataset.id));
     el.addEventListener('mouseenter',()=>{ state.selected=el.dataset.id; drawMap(filtered()); });
-    el.querySelector('.hidebtn').addEventListener('click',e=>{ e.stopPropagation(); toggleHidden(el.dataset.id); });
+    el.querySelector('.hidebtn:not(.favbtn)').addEventListener('click',e=>{ e.stopPropagation(); toggleHidden(el.dataset.id); });
+    const fb = el.querySelector('.favbtn');
+    if(fb) fb.addEventListener('click',e=>{ e.stopPropagation(); toggleFav(el.dataset.id); });
   });
 }
 
@@ -2151,6 +2183,11 @@ function render(){
   hb.classList.toggle('on', state.hiddenView);
   document.getElementById('hiddenNum').textContent = HIDDEN.size;
   document.getElementById('hiddenNote').hidden = !state.hiddenView;
+  const fb = document.getElementById('favBtn');
+  fb.hidden = !FAVS.size;
+  fb.classList.toggle('on', state.favView);
+  document.getElementById('favNum').textContent = FAVS.size;
+  document.getElementById('favNote').hidden = !state.favView;
   state.view==='grid' ? renderGrid(list) : renderCards(list);
   drawMap(list);
 }
