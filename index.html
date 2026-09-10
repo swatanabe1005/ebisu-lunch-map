@@ -142,6 +142,9 @@
   .m-h{font-size:13px;font-weight:800;letter-spacing:.1em;margin:16px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
   .rev{padding:9px 0;border-bottom:1px dashed var(--line);font-size:13px}
   .rev-head{display:flex;gap:8px;align-items:center;margin-bottom:2px}
+  .rev-act{margin-left:auto;display:flex;gap:2px}
+  .rev-act button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;opacity:.55}
+  .rev-act button:hover{opacity:1}
   .rev-stars{color:var(--curry);letter-spacing:1px}
   .rev-name{font-weight:700;font-size:12px}
   .rev-date{font-size:11px;color:var(--ink2)}
@@ -539,6 +542,9 @@ const SHOPS = [
 {id:'kosocafe', name:'KO-SO CAFE', cat:'カフェ・軽食', lat:35.648607, lng:139.7097654, price:2, g:4.4, gn:340,
  desc:'ヴィーガン・グルテンフリー対応カフェ。大豆ミートプレートやパスタ約1,300円。',
  hours:[D(660,900),D(660,900),null,D(660,900),D(660,900),D(660,900),D(660,900)], hoursText:'11:00〜/水休', pid:'ChIJAQBwlkGLGGARSXclXVaKwzs'},
+{id:'ten', name:'cafe&restaurant ten(テン)', cat:'カフェ・軽食', lat:35.6471789, lng:139.7109046, price:2, g:null, gn:null,
+ desc:'恵比寿駅東口スタジオエビス2Fの昔ながらのカフェレストラン。日替わりA/B定食などの喫茶店ランチ。',
+ hours:[D(600,1020),D(600,1020),D(600,1020),D(600,1020),D(600,1020),null,null], hoursText:'平日 10:00-17:00/土日祝休'},
 {id:'dodonpa', name:'ドドンパ弁当 本店', cat:'弁当・テイクアウト', lat:35.6480215, lng:139.7153124, price:1, g:4.5, gn:53,
  desc:'ほぼ全品500円台の行列弁当スタンド。のり弁の唐揚げが絶品。デスクランチ・公園ランチに。',
  hours:[D(570,1020),D(570,1020),D(570,1020),D(570,1020),D(570,1020),null,null], hoursText:'平日 9:30-17:00/土日休', pid:'ChIJM2vpOGuLGGARdG64iD6S2LA'},
@@ -1605,6 +1611,18 @@ let REVIEWS = {};
 let persistMode = 'none'; // claude | local | memory
 const RKEY = 'lunchmap-reviews-v1';
 const NKEY = 'lunchmap-name';
+const OKEY = 'lunchmap-owner-v1';
+// 端末ごとの秘密トークン(自分の共有投稿の編集・削除の本人確認に使う。他人には見えない)
+function ownerKey(){
+  try{
+    let k = localStorage.getItem(OKEY);
+    if(!k || !/^[a-f0-9]{16,64}$/.test(k)){
+      k = Array.from(crypto.getRandomValues(new Uint8Array(16)), b=>b.toString(16).padStart(2,'0')).join('');
+      localStorage.setItem(OKEY, k);
+    }
+    return k;
+  }catch(e){ return ''; }
+}
 function getMyName(){ try{ return (localStorage.getItem(NKEY)||'').trim(); }catch(e){ return ''; } }
 function saveMyName(n){ try{ localStorage.setItem(NKEY, n); }catch(e){} }
 // 写真は共有データにも入るため、data:image/jpeg;base64 の厳格な形式のみ描画する(XSS対策)
@@ -1638,8 +1656,15 @@ async function loadReviews(){
 
 async function persist(){
   try{
-    if(persistMode === 'claude'){ await window.storage.set(RKEY, JSON.stringify(REVIEWS), false); return true; }
-    if(persistMode === 'local'){ localStorage.setItem(RKEY, JSON.stringify(REVIEWS)); return true; }
+    // 共有由来(pub)は起動時にloadShared()で再取得されるため保存しない(localStorage容量対策)
+    const mine = {};
+    Object.entries(REVIEWS).forEach(([id, arr])=>{
+      const own = (arr||[]).filter(r=>r && !r.pub);
+      if(own.length) mine[id] = own;
+    });
+    const json = JSON.stringify(mine);
+    if(persistMode === 'claude'){ await window.storage.set(RKEY, json, false); return true; }
+    if(persistMode === 'local'){ localStorage.setItem(RKEY, json); return true; }
     return false;
   }catch(e){ return false; }
 }
@@ -1677,7 +1702,8 @@ function rowToRev(row){
 function revToRow(shopId, rev, nameFallback){
   const ps = revPhotos(rev);
   return {shop_id: shopId, stars: rev.s, yen: (rev.y > 0 ? rev.y : null),
-          comment: rev.c || '', name: rev.n || nameFallback || '', photo: ps.length ? ps.join('|') : null, t: rev.t};
+          comment: rev.c || '', name: rev.n || nameFallback || '', photo: ps.length ? ps.join('|') : null, t: rev.t,
+          owner: ownerKey() || null};
 }
 
 // 起動時に共有レビューを全件取得してマージ(1000件ずつページング)
@@ -1722,6 +1748,41 @@ async function pushShared(shopId, rev){
     if(r.status === 503) sbDownNotice();
     return r.status || 'fail';
   }catch(e){ return 'fail'; }
+}
+
+// 自分の共有投稿をサーバーから削除(ownerトークン照合)。戻り値: 削除行数 / -1=通信・APIエラー
+async function sbDeleteReview(shopId, t, stars){
+  try{
+    const r = await fetch(SB_URL + '/rest/v1/rpc/delete_review', {
+      method: 'POST',
+      headers: sbHead({'Content-Type': 'application/json'}),
+      body: JSON.stringify({p_shop_id: shopId, p_t: t, p_stars: stars, p_owner: ownerKey() || null})
+    });
+    if(!r.ok){ if(r.status === 503) sbDownNotice(); return -1; }
+    return await r.json();
+  }catch(e){ return -1; }
+}
+
+// 自分の記録(pubなし)を key(t,s) で取得
+function findMyRev(shopId, t, s){
+  return (REVIEWS[shopId]||[]).find(r=>r && !r.pub && r.t === t && r.s === s) || null;
+}
+
+async function deleteReview(shopId, t, s){
+  const rev = findMyRev(shopId, t, s);
+  if(!rev) return;
+  const shared = sbOn() && !rev.priv;
+  if(!confirm(shared ? 'この記録を削除しますか?みんなに公開した分も削除を試みます。' : 'この記録を削除しますか?')) return;
+  if(shared){
+    const n = await sbDeleteReview(shopId, t, s);
+    if(n === -1){ alert('通信エラーで共有データを削除できませんでした。あとでもう一度お試しください。'); return; }
+    if(n === 0) alert('共有済みデータはこの機能より前の投稿のため、サーバー側は削除できませんでした(Supabaseダッシュボードの Table Editor から削除できます)。この端末の記録は削除します。');
+  }
+  REVIEWS[shopId] = (REVIEWS[shopId]||[]).filter(r=>!(r && !r.pub && r.t === t && r.s === s));
+  if(!REVIEWS[shopId].length) delete REVIEWS[shopId];
+  await persist();
+  openModal(shopId);
+  render();
 }
 
 // この端末の未共有記録(共有由来 pub と公開OFF priv を除く)を一括アップロード。
@@ -2194,6 +2255,35 @@ function render(){
 
 /* ================= モーダル ================= */
 let pickStars = 0;
+let editKey = null; // 編集中の自分の記録のキー {t, s}
+
+// 自分の記録をフォームに読み込んで編集モードにする
+function startEditReview(shopId, t, s){
+  const rev = findMyRev(shopId, t, s);
+  if(!rev) return;
+  editKey = {t, s};
+  pickStars = rev.s;
+  document.getElementById('starPick').querySelectorAll('button').forEach(x=>
+    x.classList.toggle('lit', +x.dataset.v <= pickStars));
+  document.getElementById('revPrice').value = rev.y || '';
+  document.getElementById('revComment').value = rev.c || '';
+  const nm = document.getElementById('revName'); if(nm && rev.n) nm.value = rev.n;
+  const sh = document.getElementById('revShare'); if(sh) sh.checked = !rev.priv;
+  const pn = revPhotos(rev).length;
+  const lbl = document.getElementById('photoLabel');
+  lbl.firstChild.textContent = pn ? `📷 写真は現在${pn}枚(新しく選ぶと差し替え) ` : '📷 料理の写真を添付(任意・3枚まで)';
+  if(pn && !document.getElementById('delPhotoWrap')){
+    lbl.insertAdjacentHTML('afterend',
+      '<label class="switch" id="delPhotoWrap" style="margin-bottom:8px"><input type="checkbox" id="revDelPhoto">添付済みの写真を削除する</label>');
+  }
+  const btn = document.getElementById('revSubmit');
+  btn.disabled = false; btn.textContent = '修正を保存';
+  if(!document.getElementById('revCancel')){
+    btn.insertAdjacentHTML('afterend',
+      ` <button class="btn" id="revCancel" style="background:#888" onclick="openModal('${shopId}')">キャンセル</button>`);
+  }
+  btn.scrollIntoView({behavior:'smooth', block:'center'});
+}
 function openModal(id){
   state.selected = id;
   const s = SHOPS.find(x=>x.id===id);
@@ -2204,6 +2294,7 @@ function openModal(id){
   const gi = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(s.name+' 恵比寿 ランチ メニュー')}`;
   const ps = paidStats(id);
   pickStars = 0;
+  editKey = null;
   document.getElementById('modal').innerHTML = `
     <button class="m-close" onclick="closeModal()">✕</button>
     <span class="badge" style="background:${CATS[s.cat]}">${s.cat}</span>
@@ -2225,7 +2316,7 @@ function openModal(id){
       <div class="rev">
         <div class="rev-head"><span class="rev-stars">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}</span>
         <span class="rev-name">${r.pub ? escapeHtml(r.n||'投稿者') : (r.n ? escapeHtml(r.n)+'(自分)' : '自分')}</span>
-        <span class="rev-date">${new Date(r.t).toLocaleDateString('ja-JP')}</span>${r.y?`<span class="rev-yen">¥${r.y.toLocaleString()}</span>`:''}</div>
+        <span class="rev-date">${new Date(r.t).toLocaleDateString('ja-JP')}</span>${r.y?`<span class="rev-yen">¥${r.y.toLocaleString()}</span>`:''}${r.pub?'':`<span class="rev-act"><button title="修正" onclick="startEditReview('${id}',${r.t},${r.s})">✏️</button><button title="削除" onclick="deleteReview('${id}',${r.t},${r.s})">🗑</button></span>`}</div>
         <div>${escapeHtml(r.c||'')}</div>
         ${revPhotos(r).length ? `<div class="rev-photos">${revPhotos(r).map(p=>`<img class="rev-photo" src="${p}" onclick="showPhoto(this.src)" alt="料理写真">`).join('')}</div>` : ''}
       </div>`).join('') || '<div style="font-size:12.5px;color:var(--ink2)">まだ記録がありません。行ったら星とひとことを残しましょう。</div>'}
@@ -2347,9 +2438,10 @@ async function submitReview(id){
   const name = nameEl ? nameEl.value.trim().slice(0,20) : '';
   if(name) saveMyName(name);
   const shareEl = document.getElementById('revShare');
-  const share = sbOn() && (!shareEl || shareEl.checked);
+  let share = sbOn() && (!shareEl || shareEl.checked);
+  const editing = editKey ? findMyRev(id, editKey.t, editKey.s) : null;
   const rev = {s:pickStars, n:name,
-               c:document.getElementById('revComment').value.trim(), t:Date.now()};
+               c:document.getElementById('revComment').value.trim(), t:editing ? editing.t : Date.now()};
   if(!share) rev.priv = 1; // ローカル限定(一括共有からも除外)
   const yen = parseInt(document.getElementById('revPrice').value, 10);
   if(yen > 0 && yen < 100000) rev.y = yen;
@@ -2368,12 +2460,37 @@ async function submitReview(id){
       ? '写真の圧縮に失敗したため、写真なしで投稿します。'
       : `${failed}枚の写真は圧縮に失敗したため除外しました。`);
   }
-  const res = await saveReview(id, rev);
+  let res;
+  if(editing){
+    // 写真: 新しく選ばず「削除」チェックもなければ既存の写真を引き継ぐ
+    const delPhoto = document.getElementById('revDelPhoto');
+    if(!rev.p && !(delPhoto && delPhoto.checked) && editing.p) rev.p = editing.p;
+    // 共有済みなら旧データをサーバーから削除してから新データを共有(=編集)
+    if(sbOn() && !editing.priv){
+      const del = await sbDeleteReview(id, editing.t, editing.s);
+      if(del === -1){
+        alert('通信エラーで共有済みデータを更新できませんでした。あとでもう一度お試しください。');
+        btn.disabled = false; btn.textContent = '修正を保存';
+        return;
+      }
+      if(del === 0 && share && !confirm('共有済みの旧データはこの機能より前の投稿のため書き換えられません(削除はSupabaseダッシュボードから可能です)。新しい内容を公開すると旧内容と二重に表示される場合があります。それでも公開しますか?')){
+        share = false;
+      }
+    }
+    if(share) delete rev.priv; else rev.priv = 1;
+    const i = (REVIEWS[id]||[]).indexOf(editing);
+    if(i >= 0) REVIEWS[id][i] = rev; else (REVIEWS[id] = REVIEWS[id]||[]).push(rev);
+    res = (await persist()) ? 'saved' : 'local';
+  }else{
+    res = await saveReview(id, rev);
+  }
   const shared = share ? await pushShared(id, rev) : 'off';
   openModal(id); // 再描画
   render();
   if(res !== 'saved'){
-    alert('この環境では保存できないため、画面を閉じると記録が消えます。');
+    alert(persistMode === 'local'
+      ? '端末への保存に失敗しました(保存容量の上限の可能性)。共有された記録は次回表示時に復元されます。'
+      : 'この環境では保存できないため、画面を閉じると記録が消えます。');
   }
   if(shared !== 'shared' && shared !== 'off'){
     alert(sbFailMsg(shared === 'fail' ? 0 : shared));
