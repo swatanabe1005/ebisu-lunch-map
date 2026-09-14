@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#F2F5F6">
+<meta name="robots" content="noindex">
+<title>レビュー管理 | 恵比寿ランチマップ</title>
+<style>
+  :root{
+    --ink:#17242D; --ink2:#4A5A66; --line:#DDE4E8; --bg:#F2F5F6; --card:#FFFFFF;
+    --ok:#2E7D5B; --warn:#C0392B;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic",Meiryo,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+  .wrap{max-width:860px;margin:0 auto;padding:0 16px 60px}
+  header{padding:26px 0 14px;border-bottom:2px solid var(--ink);margin-bottom:14px}
+  .kicker{font-size:11px;letter-spacing:.22em;color:var(--ink2);font-weight:700}
+  h1{font-size:clamp(20px,3.4vw,28px);font-weight:800;letter-spacing:.02em;margin:2px 0 4px}
+  .sub{font-size:12.5px;color:var(--ink2)}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  .panel h2{font-size:15px;margin-bottom:8px}
+  .panel p{font-size:12.5px;color:var(--ink2);margin-bottom:10px}
+  input,select,textarea{border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;font-size:16px;background:var(--card);color:var(--ink);font-family:inherit}
+  textarea{width:100%;resize:vertical}
+  .btn{border:1.5px solid var(--ink);background:var(--ink);color:#fff;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer}
+  .btn.ghost{background:var(--card);color:var(--ink)}
+  .btn.danger{border-color:var(--warn);background:var(--warn)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .msg{font-size:12.5px;margin-top:8px}
+  .msg.err{color:var(--warn);font-weight:600}
+  .msg.ok{color:var(--ok);font-weight:600}
+
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .toolbar input[type=search]{flex:1;min-width:180px}
+  .toolbar .count{font-size:12px;color:var(--ink2);margin-left:auto}
+  .toolbar .count b{font-size:14px;color:var(--ink)}
+
+  .rev{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+  .rev-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:13px}
+  .rev-shop{font-weight:800;font-size:14.5px}
+  .rev-sid{font-size:11px;color:var(--ink2)}
+  .rev-stars{color:#D98E04;font-weight:700;letter-spacing:.05em}
+  .rev-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:2px}
+  .rev-meta .badge{border:1px solid var(--line);border-radius:999px;padding:0 8px;font-size:10.5px;font-weight:700}
+  .rev-meta .badge.own{color:var(--ok);border-color:var(--ok)}
+  .rev-comment{font-size:13px;margin-top:6px;white-space:pre-wrap;word-break:break-word}
+  .rev-photos{display:flex;gap:6px;margin-top:8px;overflow-x:auto}
+  .rev-photos img{height:72px;border-radius:8px;border:1px solid var(--line);cursor:pointer}
+  .rev-act{display:flex;gap:6px;margin-left:auto}
+  .rev-act button{border:1.5px solid var(--line);background:var(--card);border-radius:8px;padding:3px 10px;font-size:14px;cursor:pointer}
+  .rev-act button:hover{border-color:var(--ink2)}
+
+  .edit-form{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px;display:grid;gap:8px}
+  .edit-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px}
+  .edit-row label{font-weight:700;font-size:11.5px;color:var(--ink2);width:56px;flex-shrink:0}
+  .edit-photos{display:flex;gap:10px;flex-wrap:wrap}
+  .edit-photos .ph{text-align:center;font-size:11px}
+  .edit-photos img{height:64px;border-radius:8px;border:1px solid var(--line);display:block;margin-bottom:2px}
+  .edit-act{display:flex;gap:8px;justify-content:flex-end}
+
+  .lightbox{position:fixed;inset:0;background:rgba(10,16,20,.88);display:none;align-items:center;justify-content:center;z-index:100;cursor:zoom-out}
+  .lightbox.show{display:flex}
+  .lightbox img{max-width:94vw;max-height:92vh;border-radius:10px}
+  .empty{text-align:center;color:var(--ink2);font-size:13px;padding:30px 0}
+  .foot{font-size:11.5px;color:var(--ink2);margin-top:20px}
+  .foot a{color:var(--ink2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="kicker">EBISU LUNCH MAP — ADMIN</div>
+  <h1>レビュー管理</h1>
+  <div class="sub">共有レビュー(Supabase)の一覧・編集・削除</div>
+</header>
+
+<div class="panel" id="keyPanel" hidden>
+  <h2>管理キーの設定</h2>
+  <p>Supabase の secret キー(<code>sb_secret_...</code> または service_role)を入力してください。キーはこの端末のブラウザにのみ保存され、送信先は自分の Supabase だけです。</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <input type="password" id="keyInput" placeholder="sb_secret_..." style="flex:1;min-width:220px" autocomplete="off">
+    <button class="btn" id="keySave">保存して接続</button>
+  </div>
+  <div class="msg" id="keyMsg"></div>
+</div>
+
+<div id="adminUI" hidden>
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="店名・投稿者・コメントで検索">
+    <span class="count"><b id="cnt">0</b> 件</span>
+    <button class="btn ghost" id="reload" title="再読み込み">↻</button>
+  </div>
+  <div id="list"></div>
+  <div class="empty" id="emptyMsg" hidden>該当するレビューがありません。</div>
+  <div class="foot"><a href="javascript:void(0)" id="keyClear">管理キーを消去</a> / <a href="index.html">マップへ戻る</a></div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('show')"><img id="lightboxImg" alt="料理写真"></div>
+
+<script>
+const SB_URL = 'https://ruywwsmqmpxgvuubedzr.supabase.co';
+const AKEY = 'lunchmap-admin-key-v1';
+const SAFE_IMG = p => typeof p==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(p);
+
+let adminKey = '';
+let ROWS = [];          // サーバーの全行 {id, shop_id, stars, yen, comment, name, photo, t, owner, created_at}
+let SHOP_NAMES = {};    // shop_id -> 店名(index.htmlから抽出)
+let editingId = null;   // 編集フォームを開いている行id
+
+const $ = id => document.getElementById(id);
+const head = extra => Object.assign({apikey: adminKey, Authorization: 'Bearer ' + adminKey}, extra || {});
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const photos = row => (row.photo ? row.photo.split('|') : []).filter(SAFE_IMG).slice(0, 3);
+const shopName = id => SHOP_NAMES[id] || id;
+
+/* ===== キー管理 ===== */
+function getKey(){ try{ return localStorage.getItem(AKEY) || ''; }catch(e){ return ''; } }
+function setKey(k){ try{ if(k) localStorage.setItem(AKEY, k); else localStorage.removeItem(AKEY); }catch(e){} }
+
+// 'ok' | 'anon'(読取専用キー) | 'bad'。id=0 は存在しないため 0件PATCH=副作用なしで書込み権限を確認できる
+async function testKey(k){
+  const h = {apikey: k, Authorization: 'Bearer ' + k, 'Content-Type': 'application/json', 'Prefer': 'return=minimal'};
+  try{
+    const w = await fetch(SB_URL + '/rest/v1/reviews?id=eq.0',
+      {method: 'PATCH', headers: h, body: '{"stars":5}'});
+    if(w.ok) return 'ok';
+    const r = await fetch(SB_URL + '/rest/v1/reviews?select=id&limit=1', {headers: h});
+    return r.ok ? 'anon' : 'bad';
+  }catch(e){ return 'bad'; }
+}
+
+async function saveKey(){
+  const k = $('keyInput').value.trim();
+  const msg = $('keyMsg');
+  if(!k){ msg.className = 'msg err'; msg.textContent = 'キーを入力してください。'; return; }
+  $('keySave').disabled = true;
+  msg.className = 'msg'; msg.textContent = '接続確認中…';
+  const res = await testKey(k);
+  if(res === 'ok'){
+    setKey(k); adminKey = k;
+    msg.textContent = '';
+    $('keyPanel').hidden = true;
+    $('adminUI').hidden = false;
+    await loadAll();
+  }else{
+    msg.className = 'msg err';
+    msg.textContent = res === 'anon'
+      ? 'それは読み取り専用の公開(anon)キーです。編集・削除には secret キー(sb_secret_... / service_role)が必要です(保存していません)。'
+      : '接続できませんでした。キーが正しいか確認してください(保存していません)。';
+  }
+  $('keySave').disabled = false;
+}
+
+function clearKey(){
+  if(!confirm('保存済みの管理キーを消去しますか?')) return;
+  setKey(''); adminKey = '';
+  $('adminUI').hidden = true;
+  $('keyPanel').hidden = false;
+  $('keyInput').value = '';
+}
+
+/* ===== 店名マップ(index.htmlのSHOPSから抽出) ===== */
+async function loadShopNames(){
+  try{
+    const r = await fetch('index.html', {cache:'no-store'});
+    if(!r.ok) return;
+    const txt = await r.text();
+    const re = /\{id:'([a-z0-9_-]+)',\s*name:(?:'([^']*)'|"([^"]*)")/g;
+    let m;
+    while((m = re.exec(txt))) SHOP_NAMES[m[1]] = m[2] !== undefined ? m[2] : m[3];
+  }catch(e){}
+}
+
+/* ===== 一覧取得 ===== */
+async function loadAll(){
+  $('list').innerHTML = '<div class="empty">読み込み中…</div>';
+  try{
+    const rows = [];
+    for(let off = 0;; off += 1000){
+      const r = await fetch(SB_URL + '/rest/v1/reviews?select=*&order=t.desc&limit=1000&offset=' + off,
+        {headers: head()});
+      if(!r.ok){ $('list').innerHTML = '<div class="empty">取得に失敗しました(エラー' + r.status + ')。</div>'; return; }
+      const page = await r.json();
+      rows.push(...page);
+      if(page.length < 1000) break;
+    }
+    ROWS = rows;
+    editingId = null;
+    render();
+  }catch(e){
+    $('list').innerHTML = '<div class="empty">通信エラーで取得できませんでした。</div>';
+  }
+}
+
+/* ===== 描画 ===== */
+function normText(s){
+  return String(s||'').toLowerCase()
+    .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    .replace(/\s+/g, '');
+}
+
+function filtered(){
+  const q = normText($('q').value);
+  if(!q) return ROWS;
+  return ROWS.filter(r =>
+    normText(shopName(r.shop_id)).includes(q) || normText(r.shop_id).includes(q) ||
+    normText(r.name).includes(q) || normText(r.comment).includes(q));
+}
+
+function render(){
+  const rows = filtered();
+  $('cnt').textContent = rows.length;
+  $('emptyMsg').hidden = rows.length > 0;
+  $('list').innerHTML = rows.map(r => r.id === editingId ? cardEdit(r) : card(r)).join('');
+}
+
+function card(r){
+  const ps = photos(r);
+  return `<div class="rev" id="rev-${r.id}">
+    <div class="rev-head">
+      <span class="rev-shop">${escapeHtml(shopName(r.shop_id))}</span>
+      <span class="rev-sid">${escapeHtml(r.shop_id)}</span>
+      <span class="rev-stars">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}</span>
+      <span class="rev-act">
+        <button title="修正" onclick="startEdit(${r.id})">✏️</button>
+        <button title="削除" onclick="delRow(${r.id})">🗑</button>
+      </span>
+    </div>
+    <div class="rev-meta">
+      <span>${new Date(+r.t).toLocaleString('ja-JP')}</span>
+      <span>${escapeHtml(r.name || '投稿者')}</span>
+      ${r.yen ? `<span>¥${(+r.yen).toLocaleString()}</span>` : ''}
+      <span class="badge ${r.owner ? 'own' : ''}">${r.owner ? '本人削除可' : 'ownerなし'}</span>
+    </div>
+    ${r.comment ? `<div class="rev-comment">${escapeHtml(r.comment)}</div>` : ''}
+    ${ps.length ? `<div class="rev-photos">${ps.map(p => `<img src="${p}" alt="料理写真" onclick="zoom(this.src)">`).join('')}</div>` : ''}
+  </div>`;
+}
+
+function cardEdit(r){
+  const ps = photos(r);
+  return `<div class="rev" id="rev-${r.id}">
+    <div class="rev-head">
+      <span class="rev-shop">${escapeHtml(shopName(r.shop_id))}</span>
+      <span class="rev-sid">${escapeHtml(r.shop_id)}</span>
+      <span class="rev-meta" style="margin-top:0">${new Date(+r.t).toLocaleString('ja-JP')}</span>
+    </div>
+    <div class="edit-form">
+      <div class="edit-row"><label>星</label>
+        <select id="e-stars">${[1,2,3,4,5].map(n => `<option value="${n}"${n===r.stars?' selected':''}>${'★'.repeat(n)}</option>`).join('')}</select>
+      </div>
+      <div class="edit-row"><label>支払額</label>
+        <input type="number" id="e-yen" value="${r.yen || ''}" placeholder="未記入" min="1" max="99999" style="width:120px">円
+      </div>
+      <div class="edit-row"><label>投稿者</label>
+        <input type="text" id="e-name" value="${escapeHtml(r.name || '')}" maxlength="40" style="width:180px">
+      </div>
+      <div class="edit-row" style="align-items:flex-start"><label>コメント</label>
+        <textarea id="e-comment" rows="3" maxlength="300" style="flex:1">${escapeHtml(r.comment || '')}</textarea>
+      </div>
+      ${ps.length ? `<div class="edit-row" style="align-items:flex-start"><label>写真</label>
+        <div class="edit-photos">${ps.map((p, i) => `<div class="ph"><img src="${p}" alt="料理写真"><label><input type="checkbox" class="e-delph" value="${i}">削除</label></div>`).join('')}</div>
+      </div>` : ''}
+      <div class="edit-act">
+        <button class="btn ghost" onclick="cancelEdit()">キャンセル</button>
+        <button class="btn" onclick="saveEdit(${r.id})">保存</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function startEdit(id){ editingId = id; render(); }
+function cancelEdit(){ editingId = null; render(); }
+function zoom(src){ $('lightboxImg').src = src; $('lightbox').classList.add('show'); }
+
+/* ===== 編集(PATCH) ===== */
+async function saveEdit(id){
+  const r = ROWS.find(x => x.id === id);
+  if(!r) return;
+  const stars = +$('e-stars').value;
+  const yen = parseInt($('e-yen').value, 10);
+  const del = new Set(Array.from(document.querySelectorAll('.e-delph:checked'), el => +el.value));
+  const keep = photos(r).filter((_, i) => !del.has(i));
+  const body = {
+    stars,
+    yen: (yen > 0 && yen < 100000) ? yen : null,
+    name: $('e-name').value.trim().slice(0, 40),
+    comment: $('e-comment').value.trim().slice(0, 300),
+    photo: keep.length ? keep.join('|') : null
+  };
+  try{
+    const res = await fetch(SB_URL + '/rest/v1/reviews?id=eq.' + id, {
+      method: 'PATCH',
+      headers: head({'Content-Type': 'application/json', 'Prefer': 'return=representation'}),
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){
+      alert(res.status === 409
+        ? '保存できませんでした: 同じ店・同じ日時・同じ星の投稿がすでに存在します(星を変えるか、先に重複行を削除してください)。'
+        : '保存に失敗しました(エラー' + res.status + ')。');
+      return;
+    }
+    const updated = (await res.json())[0];
+    if(updated) Object.assign(r, updated);
+    editingId = null;
+    render();
+  }catch(e){ alert('通信エラーで保存できませんでした。'); }
+}
+
+/* ===== 削除 ===== */
+async function delRow(id){
+  const r = ROWS.find(x => x.id === id);
+  if(!r) return;
+  if(!confirm(`「${shopName(r.shop_id)}」の ${new Date(+r.t).toLocaleString('ja-JP')} のレビューを削除しますか?`)) return;
+  try{
+    const res = await fetch(SB_URL + '/rest/v1/reviews?id=eq.' + id, {
+      method: 'DELETE',
+      headers: head({'Prefer': 'return=minimal'})
+    });
+    if(!res.ok){ alert('削除に失敗しました(エラー' + res.status + ')。'); return; }
+    ROWS = ROWS.filter(x => x.id !== id);
+    render();
+  }catch(e){ alert('通信エラーで削除できませんでした。'); }
+}
+
+/* ===== 起動 ===== */
+async function init(){
+  $('keySave').onclick = saveKey;
+  $('keyInput').addEventListener('keydown', e => { if(e.key === 'Enter') saveKey(); });
+  $('keyClear').onclick = clearKey;
+  $('reload').onclick = loadAll;
+  $('q').addEventListener('input', render);
+  loadShopNames().then(() => { if(ROWS.length) render(); });
+  adminKey = getKey();
+  if(adminKey){
+    const res = await testKey(adminKey);
+    if(res === 'ok'){
+      $('adminUI').hidden = false;
+      await loadAll();
+      return;
+    }
+    // 通信障害の可能性もあるため保存済みキーは消さない(消去はフッターのリンクから)
+    const msg = $('keyMsg');
+    msg.className = 'msg err';
+    msg.textContent = res === 'anon'
+      ? '保存済みのキーは読み取り専用の公開(anon)キーです。secret キーを入力し直してください。'
+      : '保存済みのキーで接続できませんでした(通信エラーの可能性もあります)。再読み込みするか、キーを入力し直してください。';
+  }
+  $('keyPanel').hidden = false;
+}
+init();
+</script>
+</body>
+</html>
