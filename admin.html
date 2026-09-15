@@ -110,7 +110,11 @@ let SHOP_NAMES = {};    // shop_id -> 店名(index.htmlから抽出)
 let editingId = null;   // 編集フォームを開いている行id
 
 const $ = id => document.getElementById(id);
-const head = extra => Object.assign({apikey: adminKey, Authorization: 'Bearer ' + adminKey}, extra || {});
+// sb_secret_/sb_publishable_ は JWT でないため Authorization に入れると 401 になる
+const authHeaders = k => k.startsWith('sb_')
+  ? {apikey: k}
+  : {apikey: k, Authorization: 'Bearer ' + k};
+const head = extra => Object.assign(authHeaders(adminKey), extra || {});
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const photos = row => (row.photo ? row.photo.split('|') : []).filter(SAFE_IMG).slice(0, 3);
 const shopName = id => SHOP_NAMES[id] || id;
@@ -121,7 +125,7 @@ function setKey(k){ try{ if(k) localStorage.setItem(AKEY, k); else localStorage.
 
 // 'ok' | 'anon'(読取専用キー) | 'bad'。id=0 は存在しないため 0件PATCH=副作用なしで書込み権限を確認できる
 async function testKey(k){
-  const h = {apikey: k, Authorization: 'Bearer ' + k, 'Content-Type': 'application/json', 'Prefer': 'return=minimal'};
+  const h = Object.assign(authHeaders(k), {'Content-Type': 'application/json', 'Prefer': 'return=minimal'});
   try{
     const w = await fetch(SB_URL + '/rest/v1/reviews?id=eq.0',
       {method: 'PATCH', headers: h, body: '{"stars":5}'});
