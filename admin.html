@@ -123,17 +123,19 @@ const shopName = id => SHOP_NAMES[id] || id;
 function getKey(){ try{ return localStorage.getItem(AKEY) || ''; }catch(e){ return ''; } }
 function setKey(k){ try{ if(k) localStorage.setItem(AKEY, k); else localStorage.removeItem(AKEY); }catch(e){} }
 
-// 'ok' | 'anon'(読取専用キー) | 'bad'(キー不正) | 'net'(通信不能=プロキシ遮断等)
+// res: 'ok' | 'anon'(読取専用キー) | 'bad'(キー不正。detailにHTTP状態と応答) | 'net'(通信不能=プロキシ遮断等)
 // id=0 は存在しないため 0件PATCH=副作用なしで書込み権限を確認できる
 async function testKey(k){
   const h = Object.assign(authHeaders(k), {'Content-Type': 'application/json', 'Prefer': 'return=minimal'});
   try{
     const w = await fetch(SB_URL + '/rest/v1/reviews?id=eq.0',
       {method: 'PATCH', headers: h, body: '{"stars":5}'});
-    if(w.ok) return 'ok';
+    if(w.ok) return {res: 'ok'};
     const r = await fetch(SB_URL + '/rest/v1/reviews?select=id&limit=1', {headers: h});
-    return r.ok ? 'anon' : 'bad';
-  }catch(e){ return 'net'; }
+    if(r.ok) return {res: 'anon'};
+    let d = ''; try{ d = (await r.text()).slice(0, 200); }catch(e){}
+    return {res: 'bad', detail: 'HTTP ' + r.status + (d ? ' — ' + d : '')};
+  }catch(e){ return {res: 'net'}; }
 }
 
 async function saveKey(){
@@ -142,7 +144,7 @@ async function saveKey(){
   if(!k){ msg.className = 'msg err'; msg.textContent = 'キーを入力してください。'; return; }
   $('keySave').disabled = true;
   msg.className = 'msg'; msg.textContent = '接続確認中…';
-  const res = await testKey(k);
+  const {res, detail} = await testKey(k);
   if(res === 'ok'){
     setKey(k); adminKey = k;
     msg.textContent = '';
@@ -155,7 +157,7 @@ async function saveKey(){
       ? 'それは読み取り専用の公開(anon)キーです。編集・削除には secret キー(sb_secret_... / service_role)が必要です(保存していません)。'
       : res === 'net'
       ? 'Supabase に通信できませんでした。キーの問題ではなく、社内プロキシ等でブロックされている可能性があります。別のネットワーク(スマホ回線等)でお試しください(保存していません)。'
-      : 'キーが拒否されました。secret キー(sb_secret_... / service_role)が正しいか確認してください(保存していません)。';
+      : 'キーが拒否されました(' + (detail || '詳細不明') + ')。secret キーがこのプロジェクト(' + SB_URL.replace('https://','').split('.')[0] + ')のものか、無効化されていないか確認してください(保存していません)。';
   }
   $('keySave').disabled = false;
 }
@@ -342,7 +344,7 @@ async function init(){
   loadShopNames().then(() => { if(ROWS.length) render(); });
   adminKey = getKey();
   if(adminKey){
-    const res = await testKey(adminKey);
+    const {res, detail} = await testKey(adminKey);
     if(res === 'ok'){
       $('adminUI').hidden = false;
       await loadAll();
@@ -355,7 +357,7 @@ async function init(){
       ? '保存済みのキーは読み取り専用の公開(anon)キーです。secret キーを入力し直してください。'
       : res === 'net'
       ? 'Supabase に通信できませんでした(社内プロキシ等のブロックの可能性)。別のネットワークで再読み込みしてください。保存済みキーは消していません。'
-      : '保存済みのキーが拒否されました。キーを入力し直してください。';
+      : '保存済みのキーが拒否されました(' + (detail || '詳細不明') + ')。キーを入力し直してください。';
   }
   $('keyPanel').hidden = false;
 }
