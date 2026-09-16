@@ -68,6 +68,33 @@
   .rm-row button:hover{border-color:var(--ink2)}
   .rm-row button.warn{color:var(--warn);border-color:var(--warn)}
 
+  .tabs{display:flex;gap:0;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;width:max-content;margin-bottom:14px}
+  .tabs button{border:none;background:var(--card);color:var(--ink2);font-size:13px;font-weight:700;font-family:inherit;padding:8px 22px;cursor:pointer}
+  .tabs button.on{background:var(--ink);color:#fff}
+
+  /* 店一覧カード(index.htmlのリスト表示と同等) */
+  .cards{display:flex;flex-direction:column;gap:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative;border-left:5px solid var(--line)}
+  .card.removed{opacity:.55}
+  .c-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding-right:36px}
+  .c-name{font-size:16px;font-weight:800}
+  .cat-badge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;color:#fff}
+  .rm-badge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:4px;background:#F9E8E6;color:var(--warn)}
+  .pricetag{font-size:11.5px;color:var(--ink2);font-weight:700}
+  .c-desc{font-size:12.5px;color:var(--ink2);margin:4px 0 8px}
+  .c-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;align-items:center}
+  .meta-item b{font-variant-numeric:tabular-nums}
+  .stay-ok{color:var(--ok);font-weight:700}
+  .stay-tight{color:var(--warn);font-weight:700}
+  .gstar{color:#B8860B;font-weight:700}
+  .teamstar{color:#D98E04;font-weight:700}
+  .openbadge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:4px}
+  .open-now{background:#E3F2EA;color:var(--ok)}
+  .open-later{background:#EEF1F3;color:var(--ink2)}
+  .closed-day{background:#F9E8E6;color:var(--warn)}
+  .hidebtn{position:absolute;right:10px;top:10px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.88);color:var(--ink2);font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2}
+  .hidebtn:hover{background:#fff;color:var(--ink)}
+
   .lightbox{position:fixed;inset:0;background:rgba(10,16,20,.88);display:none;align-items:center;justify-content:center;z-index:100;cursor:zoom-out}
   .lightbox.show{display:flex}
   .lightbox img{max-width:94vw;max-height:92vh;border-radius:10px}
@@ -95,21 +122,30 @@
 </div>
 
 <div id="adminUI" hidden>
-  <div class="panel">
-    <h2>店の削除(マップから除外)</h2>
-    <p>除外した店はマップ・一覧に表示されなくなります(全端末、次回読み込み時に反映)。レビューは削除されず、復元すると元どおり表示されます。</p>
-    <input type="search" id="rmQ" placeholder="店名で検索して除外" style="width:100%">
-    <div id="rmHits"></div>
-    <div id="rmList" style="margin-top:8px"></div>
+  <div class="tabs" id="tabs">
+    <button data-tab="reviews" class="on">レビュー</button>
+    <button data-tab="shops">店一覧</button>
+  </div>
+  <div id="tabReviews">
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="店名・投稿者・コメントで検索">
+      <span class="count"><b id="cnt">0</b> 件</span>
+      <button class="btn ghost" id="reload" title="再読み込み">↻</button>
+    </div>
+    <div id="list"></div>
+    <div class="empty" id="emptyMsg" hidden>該当するレビューがありません。</div>
+  </div>
+  <div id="tabShops" hidden>
+    <div class="toolbar">
+      <input type="search" id="sq" placeholder="店名・カテゴリ・説明で検索">
+      <label style="font-size:12px;font-weight:700;color:var(--ink2);display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="rmOnly">除外中のみ</label>
+      <span class="count"><b id="shopCnt">0</b> 軒<span id="rmCnt"></span></span>
+    </div>
+    <p style="font-size:12px;color:var(--ink2);margin-bottom:10px">🚫でマップから除外(全端末、次回読み込み時に反映。レビューは残ります)、↩で復元。</p>
     <div class="msg" id="rmMsg"></div>
+    <div class="cards" id="shopCards"></div>
+    <div class="empty" id="shopEmpty" hidden>該当する店がありません。</div>
   </div>
-  <div class="toolbar">
-    <input type="search" id="q" placeholder="店名・投稿者・コメントで検索">
-    <span class="count"><b id="cnt">0</b> 件</span>
-    <button class="btn ghost" id="reload" title="再読み込み">↻</button>
-  </div>
-  <div id="list"></div>
-  <div class="empty" id="emptyMsg" hidden>該当するレビューがありません。</div>
   <div class="foot"><a href="javascript:void(0)" id="keyClear">管理キーを消去</a> / <a href="index.html">マップへ戻る</a></div>
 </div>
 
@@ -188,16 +224,74 @@ function clearKey(){
   $('keyInput').value = '';
 }
 
-/* ===== 店名マップ(index.htmlのSHOPSから抽出) ===== */
-async function loadShopNames(){
+/* ===== 店データ(index.htmlのSHOPSから抽出) ===== */
+// index.html と同じカテゴリ色・価格帯ラベル(SHOPS本体のみ動的抽出)
+const CATS = {
+  '定食・和食': '#2E7D5B',
+  'ラーメン・麺': '#C0392B',
+  'そば・うどん': '#8E6A3A',
+  'カレー': '#B7950B',
+  '中華': '#B03A5B',
+  '寿司・海鮮': '#2B6CB0',
+  '肉・揚げ物': '#5D4037',
+  'アジア・エスニック': '#6B8E23',
+  'バーガー・サンド': '#E2711D',
+  'イタリアン・洋食': '#7B5EA7',
+  'カフェ・軽食': '#3D8F90',
+  '弁当・テイクアウト': '#5B7083',
+};
+const PRICES = {1:'〜1,000円', 2:'1,000〜1,500円', 3:'1,500〜2,500円', 4:'2,500円〜'};
+let SHOPS = [];       // 抽出した全店(walk/stay付与済み・walk昇順)
+let shopLoadErr = ''; // 抽出失敗時の表示メッセージ
+
+function haversine(a,b){
+  const R=6371000, toR=x=>x*Math.PI/180;
+  const dLat=toR(b.lat-a.lat), dLng=toR(b.lng-a.lng);
+  const h=Math.sin(dLat/2)**2 + Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function todayIdx(){ const d=new Date().getDay(); return d===0?6:d-1; } // 月=0…日=6
+function nowMin(){ const d=new Date(); return d.getHours()*60+d.getMinutes(); }
+const fmt = m=>`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
+function openState(s){
+  const w = s.hours && s.hours[todayIdx()];
+  if(!w) return {code:'closed', label:'本日休み'};
+  const n = nowMin();
+  if(n>=w[0] && n<w[1]) return {code:'now', label:'営業中'};
+  if(n<w[0]) return {code:'later', label:`${fmt(w[0])}開店`};
+  return {code:'done', label:'本日終了'};
+}
+function starStr(v){ const f=Math.round(v); return '★'.repeat(f)+'☆'.repeat(5-f); }
+
+async function loadShopData(){
+  let txt = '';
   try{
     const r = await fetch('index.html', {cache:'no-store'});
-    if(!r.ok) return;
-    const txt = await r.text();
-    const re = /\{id:'([a-z0-9_-]+)',\s*name:(?:'([^']*)'|"([^"]*)")/g;
-    let m;
-    while((m = re.exec(txt))) SHOP_NAMES[m[1]] = m[2] !== undefined ? m[2] : m[3];
+    if(r.ok) txt = await r.text();
   }catch(e){}
+  if(!txt){ shopLoadErr = 'index.html を取得できませんでした(店名はIDで表示されます)。'; return; }
+  // 店名マップ(SHOPS本体の抽出に失敗してもレビュー一覧の店名表示に使う)
+  const re = /\{id:'([a-z0-9_-]+)',\s*name:(?:'([^']*)'|"([^"]*)")/g;
+  let m;
+  while((m = re.exec(txt))) SHOP_NAMES[m[1]] = m[2] !== undefined ? m[2] : m[3];
+  try{
+    const s = txt.indexOf('const SHOPS = [');
+    const e = txt.indexOf('\n];', s);
+    if(s < 0 || e < 0) throw new Error('SHOPS not found');
+    const body = txt.slice(s + 'const SHOPS = ['.length, e);
+    const om = txt.match(/const ORIGIN = \{lat:([\d.]+),\s*lng:([\d.]+)\}/);
+    const origin = om ? {lat:+om[1], lng:+om[2]} : {lat:35.650109, lng:139.7125988};
+    SHOPS = new Function('const D=(s,e)=>[s,e]; return [' + body + '];')();
+    SHOPS.forEach(x=>{
+      x.walk = Math.max(1, Math.round(haversine(origin, x)*1.3/80)); // 経路係数1.3 / 分速80m
+      x.stay = 60 - x.walk*2;
+      SHOP_NAMES[x.id] = x.name;
+    });
+    SHOPS.sort((a,b)=>a.walk-b.walk);
+  }catch(e){
+    SHOPS = [];
+    shopLoadErr = '店データを読み込めませんでした(店名のみ利用できます)。';
+  }
 }
 
 /* ===== 一覧取得 ===== */
@@ -370,7 +464,7 @@ async function saveEdit(id){
   }catch(e){ alert('通信エラーで保存できませんでした。'); }
 }
 
-/* ===== 店の削除(マップから除外) ===== */
+/* ===== 店一覧タブ(表示+マップからの除外/復元) ===== */
 let REMOVED = [];        // removed_shops の全行 {shop_id, created_at}
 let rmTableOk = true;    // false = テーブル未作成(SQL未実行)
 
@@ -378,49 +472,91 @@ async function loadRemoved(){
   const msg = $('rmMsg');
   try{
     const r = await fetch(SB_URL + '/rest/v1/removed_shops?select=*&order=created_at.desc', {headers: head()});
-    if(r.status === 404){ rmTableOk = false; renderRemoved(); return; }
+    if(r.status === 404){
+      rmTableOk = false;
+      msg.className = 'msg err';
+      msg.textContent = '除外テーブルが未作成のため除外/復元は使えません(一覧表示は可能)。Supabase の SQL Editor で supabase-removed-shops.sql を実行してください。';
+      renderShops();
+      return;
+    }
     if(!r.ok){ msg.className = 'msg err'; msg.textContent = '除外リストの取得に失敗しました(エラー' + r.status + ')。'; return; }
     rmTableOk = true;
     msg.textContent = '';
     REMOVED = await r.json();
-    renderRemoved();
+    renderShops();
   }catch(e){ msg.className = 'msg err'; msg.textContent = '通信エラーで除外リストを取得できませんでした。'; }
 }
 
-function renderRemoved(){
-  if(!rmTableOk){
-    $('rmList').innerHTML = '';
-    $('rmQ').disabled = true;
-    const msg = $('rmMsg');
-    msg.className = 'msg err';
-    msg.textContent = 'テーブルが未作成です。Supabase の SQL Editor で supabase-removed-shops.sql を実行してください。';
-    return;
-  }
-  $('rmQ').disabled = false;
-  $('rmList').innerHTML = REMOVED.length
-    ? '<div style="font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:2px">除外中 ' + REMOVED.length + '軒</div>'
-      + REMOVED.map(x => `<div class="rm-row">
-          <span class="rm-name">${escapeHtml(shopName(x.shop_id))}</span>
-          <span class="rm-sid">${escapeHtml(x.shop_id)}</span>
-          <button onclick="restoreShop('${x.shop_id}')">↩ 復元</button>
-        </div>`).join('')
-    : '<div style="font-size:12px;color:var(--ink2)">除外中の店はありません。</div>';
+// 共有レビュー(ROWS)からの店別実績: 件数・平均星・支払額の中央値
+function shopStats(id){
+  const rs = ROWS.filter(r => r.shop_id === id);
+  if(!rs.length) return null;
+  const yens = rs.map(r => +r.yen).filter(y => y > 0).sort((a,b) => a-b);
+  const med = yens.length
+    ? (yens.length % 2 ? yens[(yens.length-1)/2] : Math.round((yens[yens.length/2 - 1] + yens[yens.length/2]) / 2))
+    : 0;
+  return {n: rs.length, avg: rs.reduce((s,r) => s + r.stars, 0) / rs.length, med, yn: yens.length};
 }
 
-function renderRmHits(){
-  const q = normText($('rmQ').value);
-  if(!q || !rmTableOk){ $('rmHits').innerHTML = ''; return; }
+function shopCard(s, rm){
+  const st = openState(s);
+  const badgeCls = st.code==='now' ? 'open-now' : (st.code==='closed'||st.code==='done') ? 'closed-day' : 'open-later';
+  const stayCls = s.stay >= 40 ? 'stay-ok' : 'stay-tight';
+  const ps = shopStats(s.id);
+  const col = CATS[s.cat] || '#5B7083';
+  return `<div class="card${rm ? ' removed' : ''}" style="border-left-color:${col}">
+    <div class="c-top">
+      <span class="c-name">${escapeHtml(s.name)}</span>
+      <span class="cat-badge" style="background:${col}">${escapeHtml(s.cat || '')}</span>
+      <span class="pricetag">${ps && ps.yn ? `実績 ¥${ps.med.toLocaleString()}<span style="font-weight:400">(${ps.yn}件)</span>` : (PRICES[s.price] || '')}</span>
+      <span class="openbadge ${badgeCls}">${st.label}</span>
+      ${rm ? '<span class="rm-badge">除外中</span>' : ''}
+    </div>
+    <div class="c-desc">${escapeHtml(s.desc || '')}</div>
+    <div class="c-meta">
+      <span class="meta-item">🚶 徒歩 <b>${s.walk}分</b></span>
+      <span class="meta-item ${stayCls}">⏱ 滞在可能 約<b>${s.stay}分</b></span>
+      <span class="gstar">G ${s.g != null ? s.g.toFixed(1) : '—'}</span>
+      <span class="teamstar">${ps ? `${starStr(ps.avg)} ${ps.avg.toFixed(1)}(${ps.n}件)` : 'レビューなし'}</span>
+    </div>
+    ${!rmTableOk ? '' : rm
+      ? `<button type="button" class="hidebtn" title="除外を解除" onclick="restoreShop('${s.id}')">↩</button>`
+      : `<button type="button" class="hidebtn" title="マップから除外" onclick="removeShop('${s.id}')">🚫</button>`}
+  </div>`;
+}
+
+function renderShops(){
+  const box = $('shopCards');
+  if(!box) return;
+  if(!SHOPS.length){
+    box.innerHTML = '';
+    $('shopCnt').textContent = 0;
+    $('rmCnt').textContent = '';
+    $('shopEmpty').hidden = false;
+    $('shopEmpty').textContent = shopLoadErr || '店データを読み込み中です…';
+    return;
+  }
   const removed = new Set(REMOVED.map(x => x.shop_id));
-  const hits = Object.entries(SHOP_NAMES)
-    .filter(([id, name]) => !removed.has(id) && (normText(name).includes(q) || normText(id).includes(q)))
-    .slice(0, 8);
-  $('rmHits').innerHTML = hits.length
-    ? hits.map(([id, name]) => `<div class="rm-row">
-        <span class="rm-name">${escapeHtml(name)}</span>
-        <span class="rm-sid">${escapeHtml(id)}</span>
-        <button class="warn" onclick="removeShop('${id}')">🚫 除外</button>
-      </div>`).join('')
-    : '<div style="font-size:12px;color:var(--ink2);padding:6px 0">該当する店がありません。</div>';
+  const q = normText($('sq').value);
+  const rmOnly = $('rmOnly').checked;
+  const list = SHOPS.filter(s =>
+    (!rmOnly || removed.has(s.id)) &&
+    (!q || normText(s.name + (s.cat||'') + (s.desc||'')).includes(q)));
+  // 除外中だが index.html に店データが残っていない店(データごと削除済み)
+  const known = new Set(SHOPS.map(s => s.id));
+  const orphans = REMOVED.filter(x => !known.has(x.shop_id) &&
+    (!q || normText(shopName(x.shop_id)).includes(q) || normText(x.shop_id).includes(q)));
+  $('shopCnt').textContent = list.length + orphans.length;
+  $('rmCnt').textContent = removed.size ? `(除外中 ${removed.size}軒)` : '';
+  $('shopEmpty').hidden = !!(list.length + orphans.length);
+  $('shopEmpty').textContent = '該当する店がありません。';
+  box.innerHTML = list.map(s => shopCard(s, removed.has(s.id))).join('')
+    + orphans.map(x => `<div class="rm-row">
+        <span class="rm-name">${escapeHtml(shopName(x.shop_id))}</span>
+        <span class="rm-sid">${escapeHtml(x.shop_id)}</span>
+        <span class="rm-badge">除外中(店データなし)</span>
+        <button onclick="restoreShop('${x.shop_id}')">↩ 復元</button>
+      </div>`).join('');
 }
 
 async function removeShop(id){
@@ -435,9 +571,7 @@ async function removeShop(id){
     if(!res.ok){ alert('除外に失敗しました(エラー' + res.status + ')。'); return; }
     const row = (await res.json())[0];
     if(row) REMOVED.unshift(row);
-    $('rmQ').value = '';
-    $('rmHits').innerHTML = '';
-    renderRemoved();
+    renderShops();
   }catch(e){ alert('通信エラーで除外できませんでした。'); }
 }
 
@@ -450,8 +584,7 @@ async function restoreShop(id){
     });
     if(!res.ok){ alert('復元に失敗しました(エラー' + res.status + ')。'); return; }
     REMOVED = REMOVED.filter(x => x.shop_id !== id);
-    renderRemoved();
-    renderRmHits();
+    renderShops();
   }catch(e){ alert('通信エラーで復元できませんでした。'); }
 }
 
@@ -471,6 +604,14 @@ async function delRow(id){
   }catch(e){ alert('通信エラーで削除できませんでした。'); }
 }
 
+/* ===== タブ切替 ===== */
+function setTab(t){
+  $('tabReviews').hidden = t !== 'reviews';
+  $('tabShops').hidden = t !== 'shops';
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  if(t === 'shops') renderShops();
+}
+
 /* ===== 起動 ===== */
 async function init(){
   $('keySave').onclick = saveKey;
@@ -478,8 +619,10 @@ async function init(){
   $('keyClear').onclick = clearKey;
   $('reload').onclick = loadAll;
   $('q').addEventListener('input', render);
-  $('rmQ').addEventListener('input', renderRmHits);
-  loadShopNames().then(() => { if(ROWS.length) render(); if(rmTableOk && REMOVED.length) renderRemoved(); });
+  $('sq').addEventListener('input', renderShops);
+  $('rmOnly').onchange = renderShops;
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+  loadShopData().then(() => { if(ROWS.length) render(); renderShops(); });
   adminKey = getKey();
   if(adminKey){
     const {res, detail} = await testKey(adminKey);
