@@ -284,7 +284,7 @@
   </div>
 </div>
 
-<div class="foot">記録はこの端末のブラウザに保存されます ─ <a href="javascript:void(0)" onclick="exportReviews()">バックアップ書出し</a> / <a href="javascript:void(0)" onclick="importReviews()">取込み</a> / <a href="javascript:void(0)" onclick="setGKey()">店舗写真の表示設定(Google APIキー)</a><span id="shareFoot" hidden> / <a href="javascript:void(0)" onclick="uploadAllShared()">未共有の記録を一括共有</a></span><span id="pubFoot"><br>みんなに記録を公開する: <a href="javascript:void(0)" onclick="exportPublish()">公開用書出し(reviews.json)</a> → GitHubリポジトリにアップロードで反映</span><span id="sbDown" hidden style="color:#c0392b"><br>⚠ 共有サーバー(Supabase)が停止中のため、みんなの記録の取得・共有ができません。ダッシュボードから再開してください。</span></div>
+<div class="foot">記録はこの端末のブラウザに保存されます ─ <a href="javascript:void(0)" onclick="exportReviews()">バックアップ書出し</a> / <a href="javascript:void(0)" onclick="importReviews()">取込み</a> / <a href="javascript:void(0)" onclick="exportStandalone()">配布用HTML書出し</a> / <a href="javascript:void(0)" onclick="setGKey()">店舗写真の表示設定(Google APIキー)</a><span id="shareFoot" hidden> / <a href="javascript:void(0)" onclick="uploadAllShared()">未共有の記録を一括共有</a></span><span id="pubFoot"><br>みんなに記録を公開する: <a href="javascript:void(0)" onclick="exportPublish()">公開用書出し(reviews.json)</a> → GitHubリポジトリにアップロードで反映</span><span id="sbDown" hidden style="color:#c0392b"><br>⚠ 共有サーバー(Supabase)が停止中のため、みんなの記録の取得・共有ができません。ダッシュボードから再開してください。</span></div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -292,6 +292,7 @@
 </div>
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('show')"><img id="lightboxImg" alt="料理写真"></div>
 
+<script id="embRev">/*EMBED_REVIEWS*/</script>
 <script>
 /* ===== みんなで共有(Supabase)。空のままなら従来のローカルのみ動作 ===== */
 const SB_URL = 'https://ruywwsmqmpxgvuubedzr.supabase.co';  // 例 'https://xxxx.supabase.co'
@@ -1657,9 +1658,12 @@ async function loadReviews(){
 async function persist(){
   try{
     // 共有由来(pub)は起動時にloadShared()で再取得されるため保存しない(localStorage容量対策)
+    // 自分の共有済みレビュー(非priv)の写真も同様に保存しない(サーバーにあり、
+    // loadShared→mergeReviewsで復元される。写真をlocalStorageに溜めると数件で容量上限に達するため)
     const mine = {};
     Object.entries(REVIEWS).forEach(([id, arr])=>{
-      const own = (arr||[]).filter(r=>r && !r.pub);
+      const own = (arr||[]).filter(r=>r && !r.pub)
+        .map(r=>{ if(r.p && !r.priv){ const {p, ...rest} = r; return rest; } return r; });
       if(own.length) mine[id] = own;
     });
     const json = JSON.stringify(mine);
@@ -1720,6 +1724,25 @@ async function loadShared(){
       if(rows.length < 1000) break;
     }
     REVIEWS = mergeReviews(REVIEWS, pub);
+  }catch(e){}
+}
+
+// admin.html で除外指定された店(removed_shops テーブル)をマップ・一覧から取り除く。
+// 取得失敗時は何もしない(フェールオープン=全店表示のまま)
+async function loadRemovedShops(){
+  if(!sbOn()) return;
+  try{
+    const r = await fetch(SB_URL + '/rest/v1/removed_shops?select=shop_id', {headers: sbHead()});
+    if(!r.ok) return;
+    const ids = new Set((await r.json()).map(x=>x.shop_id));
+    if(!ids.size) return;
+    for(let i=SHOPS.length-1; i>=0; i--){
+      const id = SHOPS[i].id;
+      if(!ids.has(id)) continue;
+      if(MARKERS[id]){ if(LMAP) LMAP.removeLayer(MARKERS[id]); delete MARKERS[id]; }
+      SHOPS.splice(i, 1);
+    }
+    render();
   }catch(e){}
 }
 
@@ -1880,12 +1903,15 @@ function priceDetailHtml(s, ps){
 
 /* バックアップ(機種変更・ブラウザ移行用) */
 function mergeReviews(a, b){
-  const out = {}, seen = new Set();
+  const out = {}, seen = {};
   [a, b].forEach(src=>Object.entries(src||{}).forEach(([id, arr])=>{
     (arr||[]).forEach(r=>{
       if(!r || typeof r.s !== 'number') return;
       const k = id+'|'+r.t+'|'+r.s;
-      if(seen.has(k)) return; seen.add(k);
+      // 重複時は先勝ちだが、写真だけは持っている方から補完する
+      // (自分の共有済みレビューはlocalStorageに写真を保存しないため、サーバー側の写真をここで取り込む)
+      if(seen[k]){ if(!seen[k].p && r.p) seen[k].p = r.p; return; }
+      seen[k] = r;
       (out[id] = out[id]||[]).push(r);
     });
   }));
@@ -1910,6 +1936,40 @@ function exportPublish(){
   a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], {type:'application/json'}));
   a.download = 'reviews.json'; a.click();
   alert('reviews.json を書き出しました。\nGitHubのリポジトリで「Add file → Upload files」からアップロード(上書き)すると、1〜2分後にこのページを見る全員に反映されます。\n※コメント・支払額・写真も含めて公開されます。');
+}
+// 配布用書き出し:レビュー・写真を埋め込んだ単体HTMLを生成(file://で開いても閲覧できる)
+async function exportStandalone(){
+  let src = '';
+  try{
+    const r = await fetch(location.href, {cache:'no-store'});
+    if(!r.ok) throw 0;
+    src = await r.text();
+  }catch(e){
+    alert('このページのHTMLを取得できませんでした。GitHub Pages上(オンライン版)で開いてから書き出してください。');
+    return;
+  }
+  if(src.indexOf('/*EMBED_REVIEWS*/') === -1){
+    alert('埋め込み位置が見つかりませんでした。ページを再読み込みしてからお試しください。');
+    return;
+  }
+  // 公開OFF(priv)は除外し、全件を共有由来(pub)として埋め込む(配布先で自分の記録と混ざらない)
+  const out = {};
+  let n = 0;
+  Object.entries(REVIEWS).forEach(([id, arr])=>(arr||[]).forEach(r=>{
+    if(!r || typeof r.s !== 'number' || r.priv) return;
+    const c = Object.assign({}, r, {pub:1, n: r.n || '投稿者'});
+    delete c.priv;
+    (out[id] = out[id]||[]).push(c);
+    n++;
+  }));
+  if(!n && !confirm('埋め込めるレビューがありません(地図・店舗一覧のみのHTMLになります)。書き出しますか?')) return;
+  // コメント内に閉じscriptタグ等があってもHTMLが壊れないよう "<" をエスケープ(JSONとしては等価)
+  const json = JSON.stringify(out).replace(/</g, '\\u003c');
+  src = src.replace('/*EMBED_REVIEWS*/', 'window.EMBEDDED_REVIEWS=' + json + ';');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([src], {type:'text/html'}));
+  a.download = 'lunchmap-standalone.html'; a.click();
+  alert(`レビュー${n}件(コメント・支払額・写真込み)を埋め込んだHTMLを書き出しました。\nこのファイルだけ渡せば、開いた人はオフラインでもレビューと写真を見られます(地図タイルの表示にはネット接続が必要)。\n※写真が多いとファイルが数MBになります。`);
 }
 function importReviews(){
   const inp = document.createElement('input');
@@ -2516,10 +2576,14 @@ function tick(){
     __rsT = setTimeout(()=>{ if(LMAP) LMAP.invalidateSize(); }, 200);
   });
   await loadReviews();
+  // 配布用HTML(exportStandalone)に埋め込まれたレビュー。全件pub付きなのでlocalStorageには保存されない
+  if(window.EMBEDDED_REVIEWS) REVIEWS = mergeReviews(REVIEWS, window.EMBEDDED_REVIEWS);
   await loadPublished();
   render();
   // 共有レビューは描画をブロックせず取得(無料枠プロジェクトの休止復帰・オフラインでも先にローカル表示)
-  loadShared().then(()=>render());
+  // 取得後に一度persistして、旧形式で保存された共有済み写真をlocalStorageから間引く(容量上限対策)
+  loadShared().then(()=>{ render(); persist(); });
+  loadRemovedShops();
   if(sbOn()){
     document.getElementById('shareFoot').hidden = false;
     document.getElementById('pubFoot').hidden = true;

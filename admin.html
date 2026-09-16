@@ -60,6 +60,14 @@
   .edit-photos img{height:64px;border-radius:8px;border:1px solid var(--line);display:block;margin-bottom:2px}
   .edit-act{display:flex;gap:8px;justify-content:flex-end}
 
+  .rm-row{display:flex;gap:8px;align-items:center;font-size:13px;padding:6px 0;border-top:1px dashed var(--line)}
+  .rm-row:first-child{border-top:none}
+  .rm-row .rm-name{font-weight:700}
+  .rm-row .rm-sid{font-size:11px;color:var(--ink2)}
+  .rm-row button{margin-left:auto;border:1.5px solid var(--line);background:var(--card);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+  .rm-row button:hover{border-color:var(--ink2)}
+  .rm-row button.warn{color:var(--warn);border-color:var(--warn)}
+
   .lightbox{position:fixed;inset:0;background:rgba(10,16,20,.88);display:none;align-items:center;justify-content:center;z-index:100;cursor:zoom-out}
   .lightbox.show{display:flex}
   .lightbox img{max-width:94vw;max-height:92vh;border-radius:10px}
@@ -78,15 +86,23 @@
 
 <div class="panel" id="keyPanel" hidden>
   <h2>管理キーの設定</h2>
-  <p>Supabase の secret キー(<code>sb_secret_...</code> または service_role)を入力してください。キーはこの端末のブラウザにのみ保存され、送信先は自分の Supabase だけです。</p>
+  <p>Supabase の旧形式 service_role キー(<code>eyJ...</code> で始まるJWT。ダッシュボードの API Keys → Legacy API keys タブ)を入力してください。新形式の <code>sb_secret_...</code> はSupabaseの仕様でブラウザから使用できません。キーはこの端末のブラウザにのみ保存され、送信先は自分の Supabase だけです。</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <input type="password" id="keyInput" placeholder="sb_secret_..." style="flex:1;min-width:220px" autocomplete="off">
+    <input type="password" id="keyInput" placeholder="eyJ...(service_role)" style="flex:1;min-width:220px" autocomplete="off">
     <button class="btn" id="keySave">保存して接続</button>
   </div>
   <div class="msg" id="keyMsg"></div>
 </div>
 
 <div id="adminUI" hidden>
+  <div class="panel">
+    <h2>店の削除(マップから除外)</h2>
+    <p>除外した店はマップ・一覧に表示されなくなります(全端末、次回読み込み時に反映)。レビューは削除されず、復元すると元どおり表示されます。</p>
+    <input type="search" id="rmQ" placeholder="店名で検索して除外" style="width:100%">
+    <div id="rmHits"></div>
+    <div id="rmList" style="margin-top:8px"></div>
+    <div class="msg" id="rmMsg"></div>
+  </div>
   <div class="toolbar">
     <input type="search" id="q" placeholder="店名・投稿者・コメントで検索">
     <span class="count"><b id="cnt">0</b> 件</span>
@@ -154,10 +170,12 @@ async function saveKey(){
   }else{
     msg.className = 'msg err';
     msg.textContent = res === 'anon'
-      ? 'それは読み取り専用の公開(anon)キーです。編集・削除には secret キー(sb_secret_... / service_role)が必要です(保存していません)。'
+      ? 'それは読み取り専用の公開(anon)キーです。編集・削除には旧形式の service_role キー(eyJ...)が必要です(保存していません)。'
       : res === 'net'
       ? 'Supabase に通信できませんでした。キーの問題ではなく、社内プロキシ等でブロックされている可能性があります。別のネットワーク(スマホ回線等)でお試しください(保存していません)。'
-      : 'キーが拒否されました(' + (detail || '詳細不明') + ')。secret キーがこのプロジェクト(' + SB_URL.replace('https://','').split('.')[0] + ')のものか、無効化されていないか確認してください(保存していません)。';
+      : k.startsWith('sb_secret_')
+      ? '新形式の secret キー(sb_secret_...)は Supabase の仕様によりブラウザから使用できません。ダッシュボードの API Keys → Legacy API keys タブにある service_role キー(eyJ...)を入力してください(保存していません)。'
+      : 'キーが拒否されました(' + (detail || '詳細不明') + ')。service_role キーがこのプロジェクト(' + SB_URL.replace('https://','').split('.')[0] + ')のものか、Legacy API keys が無効化されていないか確認してください(保存していません)。';
   }
   $('keySave').disabled = false;
 }
@@ -201,6 +219,7 @@ async function loadAll(){
   }catch(e){
     $('list').innerHTML = '<div class="empty">通信エラーで取得できませんでした。</div>';
   }
+  await loadRemoved();
 }
 
 /* ===== 描画 ===== */
@@ -269,9 +288,13 @@ function cardEdit(r){
       <div class="edit-row" style="align-items:flex-start"><label>コメント</label>
         <textarea id="e-comment" rows="3" maxlength="300" style="flex:1">${escapeHtml(r.comment || '')}</textarea>
       </div>
-      ${ps.length ? `<div class="edit-row" style="align-items:flex-start"><label>写真</label>
-        <div class="edit-photos">${ps.map((p, i) => `<div class="ph"><img src="${p}" alt="料理写真"><label><input type="checkbox" class="e-delph" value="${i}">削除</label></div>`).join('')}</div>
-      </div>` : ''}
+      <div class="edit-row" style="align-items:flex-start"><label>写真</label>
+        <div style="flex:1">
+          ${ps.length ? `<div class="edit-photos">${ps.map((p, i) => `<div class="ph"><img src="${p}" alt="料理写真"><label><input type="checkbox" class="e-delph" value="${i}">削除</label></div>`).join('')}</div>` : ''}
+          <input type="file" id="e-addph" accept="image/*" multiple style="border:none;padding:0;font-size:12px;margin-top:${ps.length ? 8 : 0}px">
+          <div style="font-size:11px;color:var(--ink2);margin-top:2px">追加できるのは合計3枚まで(自動で圧縮されます)</div>
+        </div>
+      </div>
       <div class="edit-act">
         <button class="btn ghost" onclick="cancelEdit()">キャンセル</button>
         <button class="btn" onclick="saveEdit(${r.id})">保存</button>
@@ -285,6 +308,24 @@ function cancelEdit(){ editingId = null; render(); }
 function zoom(src){ $('lightboxImg').src = src; $('lightbox').classList.add('show'); }
 
 /* ===== 編集(PATCH) ===== */
+// 画像を縮小・圧縮してdata URLに(index.htmlのレビュー投稿と同じ仕様)
+function compressImage(file, maxSide, quality){
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, maxSide/Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width*sc));
+      c.height = Math.max(1, Math.round(img.height*sc));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      res(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => res(null);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 async function saveEdit(id){
   const r = ROWS.find(x => x.id === id);
   if(!r) return;
@@ -292,6 +333,17 @@ async function saveEdit(id){
   const yen = parseInt($('e-yen').value, 10);
   const del = new Set(Array.from(document.querySelectorAll('.e-delph:checked'), el => +el.value));
   const keep = photos(r).filter((_, i) => !del.has(i));
+  const files = Array.from($('e-addph').files);
+  let over = 0, failed = 0;
+  for(const f of files){
+    if(keep.length >= 3){ over++; continue; }
+    let p = await compressImage(f, 900, 0.72);
+    if(p && p.length > 400000) p = await compressImage(f, 700, 0.55); // まだ大きければ更に圧縮
+    if(p && p.length <= 400000 && SAFE_IMG(p)) keep.push(p);
+    else failed++;
+  }
+  if(over) alert(over + '枚は写真3枚の上限を超えるため追加しませんでした。');
+  if(failed) alert(failed + '枚は圧縮に失敗したため追加しませんでした。');
   const body = {
     stars,
     yen: (yen > 0 && yen < 100000) ? yen : null,
@@ -318,6 +370,91 @@ async function saveEdit(id){
   }catch(e){ alert('通信エラーで保存できませんでした。'); }
 }
 
+/* ===== 店の削除(マップから除外) ===== */
+let REMOVED = [];        // removed_shops の全行 {shop_id, created_at}
+let rmTableOk = true;    // false = テーブル未作成(SQL未実行)
+
+async function loadRemoved(){
+  const msg = $('rmMsg');
+  try{
+    const r = await fetch(SB_URL + '/rest/v1/removed_shops?select=*&order=created_at.desc', {headers: head()});
+    if(r.status === 404){ rmTableOk = false; renderRemoved(); return; }
+    if(!r.ok){ msg.className = 'msg err'; msg.textContent = '除外リストの取得に失敗しました(エラー' + r.status + ')。'; return; }
+    rmTableOk = true;
+    msg.textContent = '';
+    REMOVED = await r.json();
+    renderRemoved();
+  }catch(e){ msg.className = 'msg err'; msg.textContent = '通信エラーで除外リストを取得できませんでした。'; }
+}
+
+function renderRemoved(){
+  if(!rmTableOk){
+    $('rmList').innerHTML = '';
+    $('rmQ').disabled = true;
+    const msg = $('rmMsg');
+    msg.className = 'msg err';
+    msg.textContent = 'テーブルが未作成です。Supabase の SQL Editor で supabase-removed-shops.sql を実行してください。';
+    return;
+  }
+  $('rmQ').disabled = false;
+  $('rmList').innerHTML = REMOVED.length
+    ? '<div style="font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:2px">除外中 ' + REMOVED.length + '軒</div>'
+      + REMOVED.map(x => `<div class="rm-row">
+          <span class="rm-name">${escapeHtml(shopName(x.shop_id))}</span>
+          <span class="rm-sid">${escapeHtml(x.shop_id)}</span>
+          <button onclick="restoreShop('${x.shop_id}')">↩ 復元</button>
+        </div>`).join('')
+    : '<div style="font-size:12px;color:var(--ink2)">除外中の店はありません。</div>';
+}
+
+function renderRmHits(){
+  const q = normText($('rmQ').value);
+  if(!q || !rmTableOk){ $('rmHits').innerHTML = ''; return; }
+  const removed = new Set(REMOVED.map(x => x.shop_id));
+  const hits = Object.entries(SHOP_NAMES)
+    .filter(([id, name]) => !removed.has(id) && (normText(name).includes(q) || normText(id).includes(q)))
+    .slice(0, 8);
+  $('rmHits').innerHTML = hits.length
+    ? hits.map(([id, name]) => `<div class="rm-row">
+        <span class="rm-name">${escapeHtml(name)}</span>
+        <span class="rm-sid">${escapeHtml(id)}</span>
+        <button class="warn" onclick="removeShop('${id}')">🚫 除外</button>
+      </div>`).join('')
+    : '<div style="font-size:12px;color:var(--ink2);padding:6px 0">該当する店がありません。</div>';
+}
+
+async function removeShop(id){
+  if(!confirm(`「${shopName(id)}」をマップから除外しますか?(レビューは残ります。あとで復元できます)`)) return;
+  try{
+    const res = await fetch(SB_URL + '/rest/v1/removed_shops', {
+      method: 'POST',
+      headers: head({'Content-Type': 'application/json', 'Prefer': 'return=representation'}),
+      body: JSON.stringify({shop_id: id})
+    });
+    if(res.status === 409){ alert('この店はすでに除外済みです。'); await loadRemoved(); return; }
+    if(!res.ok){ alert('除外に失敗しました(エラー' + res.status + ')。'); return; }
+    const row = (await res.json())[0];
+    if(row) REMOVED.unshift(row);
+    $('rmQ').value = '';
+    $('rmHits').innerHTML = '';
+    renderRemoved();
+  }catch(e){ alert('通信エラーで除外できませんでした。'); }
+}
+
+async function restoreShop(id){
+  if(!confirm(`「${shopName(id)}」の除外を解除して、マップに表示し直しますか?`)) return;
+  try{
+    const res = await fetch(SB_URL + '/rest/v1/removed_shops?shop_id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: head({'Prefer': 'return=minimal'})
+    });
+    if(!res.ok){ alert('復元に失敗しました(エラー' + res.status + ')。'); return; }
+    REMOVED = REMOVED.filter(x => x.shop_id !== id);
+    renderRemoved();
+    renderRmHits();
+  }catch(e){ alert('通信エラーで復元できませんでした。'); }
+}
+
 /* ===== 削除 ===== */
 async function delRow(id){
   const r = ROWS.find(x => x.id === id);
@@ -341,7 +478,8 @@ async function init(){
   $('keyClear').onclick = clearKey;
   $('reload').onclick = loadAll;
   $('q').addEventListener('input', render);
-  loadShopNames().then(() => { if(ROWS.length) render(); });
+  $('rmQ').addEventListener('input', renderRmHits);
+  loadShopNames().then(() => { if(ROWS.length) render(); if(rmTableOk && REMOVED.length) renderRemoved(); });
   adminKey = getKey();
   if(adminKey){
     const {res, detail} = await testKey(adminKey);
