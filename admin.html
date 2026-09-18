@@ -9,7 +9,7 @@
 <style>
   :root{
     --ink:#17242D; --ink2:#4A5A66; --line:#DDE4E8; --bg:#F2F5F6; --card:#FFFFFF;
-    --ok:#2E7D5B; --warn:#C0392B;
+    --ok:#2E7D5B; --warn:#C0392B; --sushi:#2B6CB0;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic",Meiryo,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
@@ -74,7 +74,7 @@
 
   /* 店一覧カード(index.htmlのリスト表示と同等) */
   .cards{display:flex;flex-direction:column;gap:10px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative;border-left:5px solid var(--line)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative;border-left:5px solid var(--line);cursor:pointer}
   .card.removed{opacity:.55}
   .c-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding-right:36px}
   .c-name{font-size:16px;font-weight:800}
@@ -95,7 +95,37 @@
   .hidebtn{position:absolute;right:10px;top:10px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.88);color:var(--ink2);font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2}
   .hidebtn:hover{background:#fff;color:var(--ink)}
 
-  .lightbox{position:fixed;inset:0;background:rgba(10,16,20,.88);display:none;align-items:center;justify-content:center;z-index:100;cursor:zoom-out}
+  /* 店詳細モーダル(index.htmlから移植) */
+  .overlay{position:fixed;inset:0;background:rgba(23,36,45,.5);z-index:100;display:none;align-items:flex-end;justify-content:center}
+  @media(min-width:640px){.overlay{align-items:center}}
+  .overlay.show{display:flex}
+  .modal{background:#fff;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:22px 22px 30px}
+  @media(min-width:640px){.modal{border-radius:18px}}
+  .m-close{float:right;border:none;background:var(--bg);width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--ink2)}
+  .m-name{font-size:21px;font-weight:800;margin:4px 0 2px}
+  .m-sub{font-size:12.5px;color:var(--ink2);margin-bottom:10px}
+  .m-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+  .m-cell{background:var(--bg);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--ink2)}
+  .m-cell b{display:block;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .price-detail{margin:12px 0;background:#FFF9E9;border:1px solid #E8D9A8;border-radius:12px;padding:12px 14px}
+  .price-detail-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .price-detail-title{font-size:12px;font-weight:800;letter-spacing:.08em;color:#7A5E12}
+  .price-detail-main{font-size:22px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+  .price-detail-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px;font-size:12px;color:var(--ink2)}
+  .price-detail-meta b{display:block;color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums}
+  .price-detail-note{margin-top:8px;padding-top:8px;border-top:1px dashed #D8C98F;font-size:11px;color:#7A5E12}
+  @media(max-width:420px){.price-detail-meta{grid-template-columns:1fr}}
+  .m-link{display:inline-block;margin:4px 0 14px;font-size:13px;font-weight:700;color:var(--sushi);text-decoration:none;border-bottom:1.5px solid currentColor}
+  .m-h{font-size:13px;font-weight:800;letter-spacing:.1em;margin:16px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+  .photostrip{display:flex;gap:6px;overflow-x:auto;margin:2px 0 10px;padding-bottom:4px}
+  .photostrip img{height:112px;border-radius:8px;cursor:zoom-in;flex:0 0 auto;border:1px solid var(--line)}
+  .setkey{display:inline-block;font-size:12px;font-weight:700;color:var(--sushi);text-decoration:none;border:1.5px dashed var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+  @media(max-width:640px){
+    .m-close{width:40px;height:40px;font-size:18px}
+    .photostrip img{height:96px}
+  }
+
+  .lightbox{position:fixed;inset:0;background:rgba(10,16,20,.88);display:none;align-items:center;justify-content:center;z-index:200;cursor:zoom-out}
   .lightbox.show{display:flex}
   .lightbox img{max-width:94vw;max-height:92vh;border-radius:10px}
   .empty{text-align:center;color:var(--ink2);font-size:13px;padding:30px 0}
@@ -141,13 +171,15 @@
       <label style="font-size:12px;font-weight:700;color:var(--ink2);display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="rmOnly">除外中のみ</label>
       <span class="count"><b id="shopCnt">0</b> 軒<span id="rmCnt"></span></span>
     </div>
-    <p style="font-size:12px;color:var(--ink2);margin-bottom:10px">🚫でマップから除外(全端末、次回読み込み時に反映。レビューは残ります)、↩で復元。</p>
+    <p style="font-size:12px;color:var(--ink2);margin-bottom:10px">カードをタップすると店の詳細(写真・共有レビュー)を表示。🚫でマップから除外(全端末、次回読み込み時に反映。レビューは残ります)、↩で復元。</p>
     <div class="msg" id="rmMsg"></div>
     <div class="cards" id="shopCards"></div>
     <div class="empty" id="shopEmpty" hidden>該当する店がありません。</div>
   </div>
   <div class="foot"><a href="javascript:void(0)" id="keyClear">管理キーを消去</a> / <a href="index.html">マップへ戻る</a></div>
 </div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
 
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('show')"><img id="lightboxImg" alt="料理写真"></div>
 
@@ -283,7 +315,8 @@ async function loadShopData(){
     const origin = om ? {lat:+om[1], lng:+om[2]} : {lat:35.650109, lng:139.7125988};
     SHOPS = new Function('const D=(s,e)=>[s,e]; return [' + body + '];')();
     SHOPS.forEach(x=>{
-      x.walk = Math.max(1, Math.round(haversine(origin, x)*1.3/80)); // 経路係数1.3 / 分速80m
+      x.dist = haversine(origin, x);
+      x.walk = Math.max(1, Math.round(x.dist*1.3/80)); // 経路係数1.3 / 分速80m
       x.stay = 60 - x.walk*2;
       SHOP_NAMES[x.id] = x.name;
     });
@@ -400,6 +433,149 @@ function cardEdit(r){
 function startEdit(id){ editingId = id; render(); }
 function cancelEdit(){ editingId = null; render(); }
 function zoom(src){ $('lightboxImg').src = src; $('lightbox').classList.add('show'); }
+function showPhoto(src){ zoom(src); }
+
+/* ===== 店舗写真(Google Places API/個人キー。index.htmlと同じ仕様・キー共用) ===== */
+let gmapsReady = null;
+const PHOTO_CACHE = {};
+function getGKey(){ try{ return (localStorage.getItem('lunchmap-gmaps-key')||'').trim(); }catch(e){ return ''; } }
+function setGKey(){
+  const k = prompt('Google Maps Platform のAPIキーを入力してください(空欄にすると解除)。\nキーはこの端末のブラウザにだけ保存されます。', getGKey());
+  if(k === null) return;
+  try{ localStorage.setItem('lunchmap-gmaps-key', k.trim()); }catch(e){ alert('この環境ではキーを保存できません'); return; }
+  location.reload();
+}
+function loadGmaps(){
+  const key = getGKey();
+  if(!key) return null;
+  if(gmapsReady) return gmapsReady;
+  gmapsReady = new Promise((res, rej)=>{
+    window.__gmapsCb = ()=>res(true);
+    const sc = document.createElement('script');
+    sc.src = 'https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&v=weekly&loading=async&callback=__gmapsCb';
+    sc.onerror = ()=>rej(new Error('load error'));
+    document.head.appendChild(sc);
+  });
+  return gmapsReady;
+}
+async function loadPlacePhotos(s){
+  if(!s.pid) return null;
+  if(PHOTO_CACHE[s.id]) return PHOTO_CACHE[s.id];
+  const ready = loadGmaps();
+  if(!ready) return null;
+  await ready;
+  const {Place} = await google.maps.importLibrary('places');
+  const p = new Place({id: s.pid});
+  await p.fetchFields({fields:['photos']});
+  const urls = (p.photos||[]).slice(0,6).map(ph=>ph.getURI({maxWidth:800, maxHeight:800}));
+  PHOTO_CACHE[s.id] = urls;
+  return urls;
+}
+function fillPhotoStrip(s){
+  const el = document.getElementById('photoStrip');
+  if(!el) return;
+  if(!getGKey()){
+    el.innerHTML = '<a class="setkey" onclick="setGKey()">🔑 Google APIキー(無料枠あり)を設定すると、ここに店・料理・メニューの写真が表示されます</a>';
+    return;
+  }
+  el.innerHTML = '<span style="font-size:12px;color:var(--ink2)">写真を読み込み中…</span>';
+  loadPlacePhotos(s).then(urls=>{
+    el.innerHTML = (urls && urls.length)
+      ? urls.map(u=>`<img src="${u}" loading="lazy" onclick="showPhoto(this.src)" alt="店の写真">`).join('')
+      : '<span style="font-size:12px;color:var(--ink2)">この店の写真が見つかりませんでした</span>';
+  }).catch(()=>{
+    el.innerHTML = '<span style="font-size:12px;color:#C0392B">写真を取得できませんでした。APIキーと「Places API (New)」の有効化を確認してください。<a class="setkey" style="border:none;padding:0 4px" onclick="setGKey()">キーを再設定</a></span>';
+  });
+}
+
+/* ===== 店詳細モーダル(index.htmlのopenModalの閲覧専用版) ===== */
+// 共有レビューの支払額の中央値(index.htmlのpaidStatsと同形の返り値)
+function paidStats(id){
+  const rows = ROWS.filter(r => r.shop_id === id && +r.yen > 0)
+    .map(r => ({y: +r.yen, t: +r.t || 0}));
+  if(!rows.length) return null;
+  const ys = rows.map(r=>r.y).sort((a,b)=>a-b);
+  const mid = Math.floor(ys.length/2);
+  const med = ys.length%2 ? ys[mid] : Math.round((ys[mid-1]+ys[mid])/2);
+  const latest = rows.reduce((a,b)=>b.t>a.t?b:a, rows[0]);
+  return {med, n:ys.length, min:ys[0], max:ys[ys.length-1], latest:latest.t};
+}
+
+function priceDetailHtml(s, ps){
+  if(!ps){
+    return `<div class="price-detail">
+      <div class="price-detail-head">
+        <span class="price-detail-title">ランチ価格の詳細</span>
+        <span class="price-detail-main">未登録</span>
+      </div>
+      <div class="price-detail-meta">
+        <div>掲載時の目安<b>${PRICES[s.price]}</b></div>
+        <div>支払記録<b>0件</b></div>
+      </div>
+      <div class="price-detail-note">支払った金額が共有されると、代表額・価格幅・最終記録日を表示します。価格は外部サイトから自動取得・定期更新しません。</div>
+    </div>`;
+  }
+  const range = ps.min===ps.max
+    ? `¥${ps.min.toLocaleString()}`
+    : `¥${ps.min.toLocaleString()}〜¥${ps.max.toLocaleString()}`;
+  const latest = ps.latest ? new Date(ps.latest).toLocaleDateString('ja-JP') : '日付なし';
+  return `<div class="price-detail">
+    <div class="price-detail-head">
+      <span class="price-detail-title">ランチ価格の詳細</span>
+      <span class="price-detail-main">代表 ¥${ps.med.toLocaleString()}</span>
+    </div>
+    <div class="price-detail-meta">
+      <div>算出方法<b>支払記録の中央値</b></div>
+      <div>記録件数<b>${ps.n}件</b></div>
+      <div>記録した価格幅<b>${range}</b></div>
+      <div>最終記録日<b>${latest}</b></div>
+      <div>掲載時の目安<b>${PRICES[s.price]}</b></div>
+    </div>
+    <div class="price-detail-note">共有レビューの支払額のみを集計しています。外部サイトからの自動取得・定期更新は行いません。</div>
+  </div>`;
+}
+
+function openShopModal(id){
+  const s = SHOPS.find(x => x.id === id);
+  if(!s) return;
+  const st = openState(s);
+  const ps = shopStats(s.id);
+  const revs = ROWS.filter(r => r.shop_id === id).sort((a,b) => b.t - a.t);
+  const gm = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name+' 恵比寿')}${s.pid ? `&query_place_id=${s.pid}` : ''}`;
+  const gi = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(s.name+' 恵比寿 ランチ メニュー')}`;
+  $('modal').innerHTML = `
+    <button class="m-close" onclick="closeShopModal()">✕</button>
+    <span class="cat-badge" style="background:${CATS[s.cat]||'#5B7083'}">${escapeHtml(s.cat||'')}</span>
+    <div class="m-name">${escapeHtml(s.name)}</div>
+    <div class="m-sub">${escapeHtml(s.desc||'')}</div>
+    <div class="photostrip" id="photoStrip"></div>
+    ${priceDetailHtml(s, paidStats(id))}
+    <div class="m-grid">
+      <div class="m-cell">徒歩(片道)<b>${s.walk}分/約${Math.round(s.dist)}m</b></div>
+      <div class="m-cell">昼休み60分での滞在目安<b>約${s.stay}分</b></div>
+      <div class="m-cell">営業時間<b style="font-size:12.5px">${escapeHtml(s.hoursText||'')}</b></div>
+      <div class="m-cell">現在<b>${st.label}</b></div>
+      <div class="m-cell">Google評価<b>${s.g != null ? `★${s.g.toFixed(1)}(${s.gn != null ? s.gn : '—'}件)` : '未取得'}</b></div>
+    </div>
+    <a class="m-link" href="${gm}" target="_blank" rel="noopener">Google Mapsで経路・店の写真を見る →</a><br>
+    <a class="m-link" href="${gi}" target="_blank" rel="noopener">メニュー・料理の画像を検索 →</a>
+    <div class="m-h">共有レビュー${ps ? ` ${starStr(ps.avg)} ${ps.avg.toFixed(1)}(${ps.n}件)` : ''}</div>
+    ${revs.map(r => `<div class="rev">
+      <div class="rev-head">
+        <span class="rev-stars">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}</span>
+      </div>
+      <div class="rev-meta">
+        <span>${new Date(+r.t).toLocaleString('ja-JP')}</span>
+        <span>${escapeHtml(r.name || '投稿者')}</span>
+        ${r.yen ? `<span>¥${(+r.yen).toLocaleString()}</span>` : ''}
+      </div>
+      ${r.comment ? `<div class="rev-comment">${escapeHtml(r.comment)}</div>` : ''}
+      ${photos(r).length ? `<div class="rev-photos">${photos(r).map(p => `<img src="${p}" alt="料理写真" onclick="zoom(this.src)">`).join('')}</div>` : ''}
+    </div>`).join('') || '<div style="font-size:12.5px;color:var(--ink2)">共有レビューはまだありません。</div>'}`;
+  fillPhotoStrip(s);
+  $('overlay').classList.add('show');
+}
+function closeShopModal(){ $('overlay').classList.remove('show'); }
 
 /* ===== 編集(PATCH) ===== */
 // 画像を縮小・圧縮してdata URLに(index.htmlのレビュー投稿と同じ仕様)
@@ -504,7 +680,7 @@ function shopCard(s, rm){
   const stayCls = s.stay >= 40 ? 'stay-ok' : 'stay-tight';
   const ps = shopStats(s.id);
   const col = CATS[s.cat] || '#5B7083';
-  return `<div class="card${rm ? ' removed' : ''}" style="border-left-color:${col}">
+  return `<div class="card${rm ? ' removed' : ''}" style="border-left-color:${col}" onclick="openShopModal('${s.id}')">
     <div class="c-top">
       <span class="c-name">${escapeHtml(s.name)}</span>
       <span class="cat-badge" style="background:${col}">${escapeHtml(s.cat || '')}</span>
@@ -520,8 +696,8 @@ function shopCard(s, rm){
       <span class="teamstar">${ps ? `${starStr(ps.avg)} ${ps.avg.toFixed(1)}(${ps.n}件)` : 'レビューなし'}</span>
     </div>
     ${!rmTableOk ? '' : rm
-      ? `<button type="button" class="hidebtn" title="除外を解除" onclick="restoreShop('${s.id}')">↩</button>`
-      : `<button type="button" class="hidebtn" title="マップから除外" onclick="removeShop('${s.id}')">🚫</button>`}
+      ? `<button type="button" class="hidebtn" title="除外を解除" onclick="event.stopPropagation();restoreShop('${s.id}')">↩</button>`
+      : `<button type="button" class="hidebtn" title="マップから除外" onclick="event.stopPropagation();removeShop('${s.id}')">🚫</button>`}
   </div>`;
 }
 
@@ -621,6 +797,7 @@ async function init(){
   $('q').addEventListener('input', render);
   $('sq').addEventListener('input', renderShops);
   $('rmOnly').onchange = renderShops;
+  $('overlay').addEventListener('click', e => { if(e.target.id === 'overlay') closeShopModal(); });
   document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
   loadShopData().then(() => { if(ROWS.length) render(); renderShops(); });
   adminKey = getKey();
