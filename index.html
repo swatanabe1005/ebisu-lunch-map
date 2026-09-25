@@ -1658,12 +1658,13 @@ async function loadReviews(){
 async function persist(){
   try{
     // 共有由来(pub)は起動時にloadShared()で再取得されるため保存しない(localStorage容量対策)
-    // 自分の共有済みレビュー(非priv)の写真も同様に保存しない(サーバーにあり、
-    // loadShared→mergeReviewsで復元される。写真をlocalStorageに溜めると数件で容量上限に達するため)
+    // 自分のレビューの写真は、サーバーへの共有成功が確認できたもの(sh)だけ保存しない
+    // (サーバーにあり、loadShared→mergeReviewsで復元される。未確認のまま間引くと、
+    //  共有失敗時=プロキシ遮断等に写真がどこにも残らず消えるため sh を条件にする)
     const mine = {};
     Object.entries(REVIEWS).forEach(([id, arr])=>{
       const own = (arr||[]).filter(r=>r && !r.pub)
-        .map(r=>{ if(r.p && !r.priv){ const {p, ...rest} = r; return rest; } return r; });
+        .map(r=>{ if(r.p && !r.priv && r.sh){ const {p, ...rest} = r; return rest; } return r; });
       if(own.length) mine[id] = own;
     });
     const json = JSON.stringify(mine);
@@ -1712,19 +1713,27 @@ function revToRow(shopId, rev, nameFallback){
 
 // 起動時に共有レビューを全件取得してマージ(1000件ずつページング)
 async function loadShared(){
-  if(!sbOn()) return;
+  if(!sbOn()) return false;
   try{
     const pub = {};
     for(let off = 0;; off += 1000){
       const r = await fetch(SB_URL + '/rest/v1/reviews?select=shop_id,stars,yen,comment,name,photo,t&order=t.asc&limit=1000&offset=' + off,
         {headers: sbHead()});
-      if(!r.ok){ if(r.status === 503) sbDownNotice(); return; }
+      if(!r.ok){ if(r.status === 503) sbDownNotice(); return false; }
       const rows = await r.json();
       rows.forEach(x => { (pub[x.shop_id] = pub[x.shop_id] || []).push(rowToRev(x)); });
       if(rows.length < 1000) break;
     }
+    // サーバーに存在が確認できた自分のレビューに共有済み印(sh)を付ける
+    // (persist で写真を間引いてよい対象になる。写真はmergeReviewsでサーバー側から補完される)
+    const onSrv = new Set();
+    Object.entries(pub).forEach(([id, arr])=>arr.forEach(r=>onSrv.add(id+'|'+r.t+'|'+r.s)));
+    Object.entries(REVIEWS).forEach(([id, arr])=>(arr||[]).forEach(r=>{
+      if(r && !r.pub && !r.priv && onSrv.has(id+'|'+r.t+'|'+r.s)) r.sh = 1;
+    }));
     REVIEWS = mergeReviews(REVIEWS, pub);
-  }catch(e){}
+    return true;
+  }catch(e){ return false; }
 }
 
 // admin.html で除外指定された店(removed_shops テーブル)をマップ・一覧から取り除く。
@@ -1835,7 +1844,7 @@ async function uploadAllShared(){
         headers: sbHead({'Content-Type': 'application/json', 'Prefer': 'return=minimal,resolution=ignore-duplicates'}),
         body: JSON.stringify(revToRow(id, rev, name))
       });
-      if(r.ok || r.status === 409){ ok++; continue; }
+      if(r.ok || r.status === 409){ ok++; rev.sh = 1; continue; }
       fail++;
       if(r.status === 503) sbDownNotice();
       if(!firstErr){
@@ -1845,6 +1854,7 @@ async function uploadAllShared(){
       }
     }catch(e){ fail++; if(!firstErr) firstErr = '通信不可(通信状況を確認してください)'; }
   }
+  if(ok) await persist(); // 共有成功分の sh を保存(写真の間引きもここで反映)
   if(!fail) alert(`${ok}件を共有しました。次回以降、このページを見る全員に表示されます。`);
   else alert(`共有: 成功${ok}件/失敗${fail}件。失敗した記録はこの端末に保存済みで、後で再実行すれば未共有分だけ再送されます。\n最初の失敗内容: ${firstErr}`);
 }
@@ -1931,6 +1941,7 @@ function exportPublish(){
   Object.values(out).forEach(arr=>arr.forEach(r=>{
     if(!r.n) r.n = name || '投稿者';
     r.pub = 1;
+    delete r.sh;
   }));
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], {type:'application/json'}));
@@ -1952,24 +1963,33 @@ async function exportStandalone(){
     alert('埋め込み位置が見つかりませんでした。ページを再読み込みしてからお試しください。');
     return;
   }
+  // 共有レビュー・写真はメモリに揃っていないことがある(起動直後・取得失敗時)ため書き出し前に再取得。
+  // 自分の共有済みレビューの写真も端末には保存しておらず、ここでの取得・マージで補完される
+  if(sbOn()){
+    const ok = await loadShared();
+    if(!ok && !confirm('共有サーバーから最新のレビューを取得できませんでした(一時停止中か通信エラー)。\nこの端末にあるレビューだけで書き出しますか?(他の人のレビューや写真が欠けます)')) return;
+  }
   // 公開OFF(priv)は除外し、全件を共有由来(pub)として埋め込む(配布先で自分の記録と混ざらない)
   const out = {};
-  let n = 0;
+  let n = 0, pn = 0;
   Object.entries(REVIEWS).forEach(([id, arr])=>(arr||[]).forEach(r=>{
     if(!r || typeof r.s !== 'number' || r.priv) return;
     const c = Object.assign({}, r, {pub:1, n: r.n || '投稿者'});
     delete c.priv;
+    delete c.sh;
     (out[id] = out[id]||[]).push(c);
     n++;
+    pn += revPhotos(r).length;
   }));
   if(!n && !confirm('埋め込めるレビューがありません(地図・店舗一覧のみのHTMLになります)。書き出しますか?')) return;
   // コメント内に閉じscriptタグ等があってもHTMLが壊れないよう "<" をエスケープ(JSONとしては等価)
   const json = JSON.stringify(out).replace(/</g, '\\u003c');
-  src = src.replace('/*EMBED_REVIEWS*/', 'window.EMBEDDED_REVIEWS=' + json + ';');
+  // 置換値に $ が含まれても特殊パターン($'等)として解釈されないよう関数で渡す
+  src = src.replace('/*EMBED_REVIEWS*/', () => 'window.EMBEDDED_REVIEWS=' + json + ';');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([src], {type:'text/html'}));
   a.download = 'lunchmap-standalone.html'; a.click();
-  alert(`レビュー${n}件(コメント・支払額・写真込み)を埋め込んだHTMLを書き出しました。\nこのファイルだけ渡せば、開いた人はオフラインでもレビューと写真を見られます(地図タイルの表示にはネット接続が必要)。\n※写真が多いとファイルが数MBになります。`);
+  alert(`レビュー${n}件・写真${pn}枚(コメント・支払額込み)を埋め込んだHTMLを書き出しました。\nこのファイルだけ渡せば、開いた人はオフラインでもレビューと写真を見られます(地図タイルの表示にはネット接続が必要)。\n※写真が多いとファイルが数MBになります。`);
 }
 function importReviews(){
   const inp = document.createElement('input');
@@ -2545,6 +2565,7 @@ async function submitReview(id){
     res = await saveReview(id, rev);
   }
   const shared = share ? await pushShared(id, rev) : 'off';
+  if(shared === 'shared'){ rev.sh = 1; await persist(); } // 共有成功を確認できたので写真は端末保存不要になる
   openModal(id); // 再描画
   render();
   if(res !== 'saved'){
