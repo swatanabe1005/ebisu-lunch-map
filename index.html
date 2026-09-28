@@ -1711,15 +1711,23 @@ function revToRow(shopId, rev, nameFallback){
           owner: ownerKey() || null};
 }
 
-// 起動時に共有レビューを全件取得してマージ(1000件ずつページング)
+// 共有レビューの取得状態(テキストと写真を分離して段階取得する)
+let sharedState = 'idle';            // テキスト取得: idle | loading | done | fail
+let photoState  = 'idle';            // 写真全件取得: idle | loading | done | fail
+let photoRun    = null;              // 実行中のloadAllPhotosのPromise(並行防止・export待ち合わせ)
+const PHOTO_DONE_SHOPS = new Set();  // loadShopPhotosで写真取得済みの店ID
+
+// 起動時に共有レビューをテキストのみ(photo列を除く)全件取得してマージ(1000件ずつページング)。
+// 写真はbase64で重いため loadAllPhotos / loadShopPhotos で段階取得する
 async function loadShared(){
   if(!sbOn()) return false;
+  sharedState = 'loading';
   try{
     const pub = {};
     for(let off = 0;; off += 1000){
-      const r = await fetch(SB_URL + '/rest/v1/reviews?select=shop_id,stars,yen,comment,name,photo,t&order=t.asc&limit=1000&offset=' + off,
+      const r = await fetch(SB_URL + '/rest/v1/reviews?select=shop_id,stars,yen,comment,name,t&order=t.asc&limit=1000&offset=' + off,
         {headers: sbHead()});
-      if(!r.ok){ if(r.status === 503) sbDownNotice(); return false; }
+      if(!r.ok){ if(r.status === 503) sbDownNotice(); sharedState = 'fail'; return false; }
       const rows = await r.json();
       rows.forEach(x => { (pub[x.shop_id] = pub[x.shop_id] || []).push(rowToRev(x)); });
       if(rows.length < 1000) break;
@@ -1732,8 +1740,60 @@ async function loadShared(){
       if(r && !r.pub && !r.priv && onSrv.has(id+'|'+r.t+'|'+r.s)) r.sh = 1;
     }));
     REVIEWS = mergeReviews(REVIEWS, pub);
+    sharedState = 'done';
     return true;
-  }catch(e){ return false; }
+  }catch(e){ sharedState = 'fail'; return false; }
+}
+
+// 写真付きレビューだけを30件ずつページング取得し、1ページごとにマージ+再描画(写真が段階的に出る)。
+// select列はテキスト分も含めて rowToRev をそのまま使う(名前欠落防止。重複DL量は写真に比べ無視できる)
+function loadAllPhotos(force){
+  if(!sbOn()) return Promise.resolve(false);
+  if(photoRun) return photoRun;                             // 実行中はそのPromiseを共有
+  if(photoState === 'done' && !force) return Promise.resolve(true);
+  photoState = 'loading';
+  photoRun = (async()=>{
+    try{
+      for(let off = 0;; off += 30){
+        const r = await fetch(SB_URL + '/rest/v1/reviews?select=shop_id,stars,yen,comment,name,photo,t&photo=not.is.null&order=t.asc&limit=30&offset=' + off,
+          {headers: sbHead()});
+        if(!r.ok){ if(r.status === 503) sbDownNotice(); photoState = 'fail'; refreshModalRevs(); return false; }
+        const rows = await r.json();
+        if(rows.length){
+          const pub = {};
+          rows.forEach(x => { (pub[x.shop_id] = pub[x.shop_id] || []).push(rowToRev(x)); });
+          REVIEWS = mergeReviews(REVIEWS, pub);   // 既存の写真補完(pが無い側に補う)がページごとに効く
+          render();
+          refreshModalRevs();
+        }
+        if(rows.length < 30) break;
+      }
+      photoState = 'done';
+      render(); refreshModalRevs();               // 「写真を読み込み中…」の消去
+      return true;
+    }catch(e){ photoState = 'fail'; refreshModalRevs(); return false; }
+    finally{ photoRun = null; }
+  })();
+  return photoRun;
+}
+
+// モーダルで開いた店の写真を優先取得(loadAllPhotos完了前の先回り)
+async function loadShopPhotos(id){
+  if(!sbOn() || photoState === 'done' || PHOTO_DONE_SHOPS.has(id)) return;
+  PHOTO_DONE_SHOPS.add(id);                       // 先に登録して同じ店の並行呼び出しを防ぐ
+  try{
+    const r = await fetch(SB_URL + '/rest/v1/reviews?select=shop_id,stars,yen,comment,name,photo,t&shop_id=eq.' + encodeURIComponent(id) + '&photo=not.is.null&order=t.asc',
+      {headers: sbHead()});
+    if(!r.ok){ PHOTO_DONE_SHOPS.delete(id); refreshModalRevs(); return; }
+    const rows = await r.json();
+    if(rows.length){
+      const pub = {};
+      rows.forEach(x => { (pub[x.shop_id] = pub[x.shop_id] || []).push(rowToRev(x)); });
+      REVIEWS = mergeReviews(REVIEWS, pub);
+      render();
+    }
+    refreshModalRevs();                           // 写真0件でも「写真を読み込み中…」を消す
+  }catch(e){ PHOTO_DONE_SHOPS.delete(id); refreshModalRevs(); }
 }
 
 // admin.html で除外指定された店(removed_shops テーブル)をマップ・一覧から取り除く。
@@ -1967,7 +2027,8 @@ async function exportStandalone(){
   // 自分の共有済みレビューの写真も端末には保存しておらず、ここでの取得・マージで補完される
   if(sbOn()){
     const ok = await loadShared();
-    if(!ok && !confirm('共有サーバーから最新のレビューを取得できませんでした(一時停止中か通信エラー)。\nこの端末にあるレビューだけで書き出しますか?(他の人のレビューや写真が欠けます)')) return;
+    const okP = await loadAllPhotos(true); // 実行中ならそのPromiseを待つ。取得済みでも最新化のため再取得(mergeが重複排除)
+    if((!ok || !okP) && !confirm('共有サーバーから最新のレビュー・写真を取得できませんでした(一時停止中か通信エラー)。\nこの端末にあるレビューだけで書き出しますか?(他の人のレビューや写真が欠けます)')) return;
   }
   // 公開OFF(priv)は除外し、全件を共有由来(pub)として埋め込む(配布先で自分の記録と混ざらない)
   const out = {};
@@ -2315,8 +2376,11 @@ function render(){
   badge.hidden = n === 0;
   badge.textContent = n;
   document.getElementById('fbarCount').textContent = list.length;
+  const sharedLoading = sbOn() && (sharedState === 'loading' || photoState === 'loading' ||
+    (sharedState === 'done' && photoState === 'idle')); // テキスト完了→写真取得開始までの隙間もカバー
   document.getElementById('emptyMsg').textContent = state.view==='grid'
-    ? '写真が登録された店がありません。店の記録に写真を付けると、ここに表示されます。'
+    ? (sharedLoading ? '写真を読み込み中…'
+       : '写真が登録された店がありません。店の記録に写真を付けると、ここに表示されます。')
     : '条件に合う店がありません。フィルタを緩めてみてください。';
   document.querySelectorAll('#viewToggle button').forEach(b=>b.classList.toggle('on', b.dataset.view===state.view));
   const hb = document.getElementById('hiddenBtn');
@@ -2364,12 +2428,42 @@ function startEditReview(shopId, t, s){
   }
   btn.scrollIntoView({behavior:'smooth', block:'center'});
 }
+// レビュー見出し+一覧のHTML。モーダル全体を作り直さず #mRevs だけ差し替えるために分離
+// (共有レビュー・写真の取得完了時に反映しても投稿フォームの入力が消えないようにする)
+function modalRevsHtml(id){
+  const ta = teamAvg(id);
+  const revs = (REVIEWS[id]||[]).slice().reverse();
+  const empty = (sbOn() && sharedState === 'loading')
+    ? '<div style="font-size:12.5px;color:var(--ink2)">みんなの記録を読み込み中…</div>'
+    : (sbOn() && sharedState === 'fail')
+      ? '<div style="font-size:12.5px;color:#C0392B">みんなの記録を読み込めませんでした(通信エラーまたはサーバー停止中)。この端末の記録のみ表示しています。</div>'
+      : '<div style="font-size:12.5px;color:var(--ink2)">まだ記録がありません。行ったら星とひとことを残しましょう。</div>';
+  const photoPending = sbOn() && revs.length && sharedState !== 'fail'
+    && photoState !== 'done' && photoState !== 'fail' && !PHOTO_DONE_SHOPS.has(id);
+  return `<div class="m-h">${sbOn()?'みんなの記録':'自分の記録'} ${ta?`平均 ${ta.avg.toFixed(1)}(${ta.n}件)`:'(まだありません)'}</div>
+    <div id="revList">${revs.map(r=>`
+      <div class="rev">
+        <div class="rev-head"><span class="rev-stars">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}</span>
+        <span class="rev-name">${r.pub ? escapeHtml(r.n||'投稿者') : (r.n ? escapeHtml(r.n)+'(自分)' : '自分')}</span>
+        <span class="rev-date">${new Date(r.t).toLocaleDateString('ja-JP')}</span>${r.y?`<span class="rev-yen">¥${r.y.toLocaleString()}</span>`:''}${r.pub?'':`<span class="rev-act"><button title="修正" onclick="startEditReview('${id}',${r.t},${r.s})">✏️</button><button title="削除" onclick="deleteReview('${id}',${r.t},${r.s})">🗑</button></span>`}</div>
+        <div>${escapeHtml(r.c||'')}</div>
+        ${revPhotos(r).length ? `<div class="rev-photos">${revPhotos(r).map(p=>`<img class="rev-photo" src="${p}" onclick="showPhoto(this.src)" alt="料理写真">`).join('')}</div>` : ''}
+      </div>`).join('') || empty}
+    ${photoPending ? '<div style="font-size:12px;color:var(--ink2)">写真を読み込み中…</div>' : ''}</div>`;
+}
+function fillModalRevs(id){
+  const el = document.getElementById('mRevs');
+  if(el) el.innerHTML = modalRevsHtml(id);
+}
+// モーダルが開いていれば、選択中の店のレビュー一覧だけを差し替える(取得完了フック用)
+function refreshModalRevs(){
+  if(state.selected && document.getElementById('overlay').classList.contains('show')) fillModalRevs(state.selected);
+}
+
 function openModal(id){
   state.selected = id;
   const s = SHOPS.find(x=>x.id===id);
   const st = openState(s);
-  const ta = teamAvg(id);
-  const revs = (REVIEWS[id]||[]).slice().reverse();
   const gm = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name+' 恵比寿')}${s.pid?`&query_place_id=${s.pid}`:''}`;
   const gi = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(s.name+' 恵比寿 ランチ メニュー')}`;
   const ps = paidStats(id);
@@ -2391,16 +2485,7 @@ function openModal(id){
     </div>
     <a class="m-link" href="${gm}" target="_blank" rel="noopener">Google Mapsで経路・店の写真を見る →</a><br>
     <a class="m-link" href="${gi}" target="_blank" rel="noopener">メニュー・料理の画像を検索 →</a>
-    <div class="m-h">${sbOn()?'みんなの記録':'自分の記録'} ${ta?`平均 ${ta.avg.toFixed(1)}(${ta.n}件)`:'(まだありません)'}</div>
-    <div id="revList">${revs.map(r=>`
-      <div class="rev">
-        <div class="rev-head"><span class="rev-stars">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}</span>
-        <span class="rev-name">${r.pub ? escapeHtml(r.n||'投稿者') : (r.n ? escapeHtml(r.n)+'(自分)' : '自分')}</span>
-        <span class="rev-date">${new Date(r.t).toLocaleDateString('ja-JP')}</span>${r.y?`<span class="rev-yen">¥${r.y.toLocaleString()}</span>`:''}${r.pub?'':`<span class="rev-act"><button title="修正" onclick="startEditReview('${id}',${r.t},${r.s})">✏️</button><button title="削除" onclick="deleteReview('${id}',${r.t},${r.s})">🗑</button></span>`}</div>
-        <div>${escapeHtml(r.c||'')}</div>
-        ${revPhotos(r).length ? `<div class="rev-photos">${revPhotos(r).map(p=>`<img class="rev-photo" src="${p}" onclick="showPhoto(this.src)" alt="料理写真">`).join('')}</div>` : ''}
-      </div>`).join('') || '<div style="font-size:12.5px;color:var(--ink2)">まだ記録がありません。行ったら星とひとことを残しましょう。</div>'}
-    </div>
+    <div id="mRevs">${modalRevsHtml(id)}</div>
     <div class="m-h">記録を書く</div>
     <div class="fform">
       <div class="starpick" id="starPick">${[1,2,3,4,5].map(i=>`<button data-v="${i}">★</button>`).join('')}</div>
@@ -2428,6 +2513,7 @@ function openModal(id){
       n ? `📷 ${Math.min(n,3)}枚を添付済み${n>3?'(先頭3枚のみ使用)':''} ` : '📷 料理の写真を添付(任意・3枚まで)';
   };
   fillPhotoStrip(s);
+  loadShopPhotos(id); // この店の共有写真を優先取得(完了時に #mRevs を部分更新)
   document.getElementById('overlay').classList.add('show');
   drawMap(filtered());
 }
@@ -2601,9 +2687,9 @@ function tick(){
   if(window.EMBEDDED_REVIEWS) REVIEWS = mergeReviews(REVIEWS, window.EMBEDDED_REVIEWS);
   await loadPublished();
   render();
-  // 共有レビューは描画をブロックせず取得(無料枠プロジェクトの休止復帰・オフラインでも先にローカル表示)
-  // 取得後に一度persistして、旧形式で保存された共有済み写真をlocalStorageから間引く(容量上限対策)
-  loadShared().then(()=>{ render(); persist(); });
+  // 共有レビューは描画をブロックせず、テキストを先に取得→写真は loadAllPhotos で段階取得
+  // 取得後に一度persistして、共有成功確認済み(sh)の写真をlocalStorageから間引く(容量上限対策)
+  loadShared().then(ok=>{ render(); refreshModalRevs(); persist(); if(ok) loadAllPhotos(); });
   loadRemovedShops();
   if(sbOn()){
     document.getElementById('shareFoot').hidden = false;
