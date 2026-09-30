@@ -293,6 +293,7 @@
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('show')"><img id="lightboxImg" alt="料理写真"></div>
 
 <script id="embRev">/*EMBED_REVIEWS*/</script>
+<script id="embTiles">/*EMBED_TILES*/</script>
 <script>
 /* ===== みんなで共有(Supabase)。空のままなら従来のローカルのみ動作 ===== */
 const SB_URL = 'https://ruywwsmqmpxgvuubedzr.supabase.co';  // 例 'https://xxxx.supabase.co'
@@ -1796,7 +1797,7 @@ async function loadShopPhotos(id){
   }catch(e){ PHOTO_DONE_SHOPS.delete(id); refreshModalRevs(); }
 }
 
-// admin.html で除外指定された店(removed_shops テーブル)をマップ・一覧から取り除く。
+// admin.html で削除指定された店(removed_shops テーブル)をマップ・一覧から取り除く。
 // 取得失敗時は何もしない(フェールオープン=全店表示のまま)
 async function loadRemovedShops(){
   if(!sbOn()) return;
@@ -2008,7 +2009,40 @@ function exportPublish(){
   a.download = 'reviews.json'; a.click();
   alert('reviews.json を書き出しました。\nGitHubのリポジトリで「Add file → Upload files」からアップロード(上書き)すると、1〜2分後にこのページを見る全員に反映されます。\n※コメント・支払額・写真も含めて公開されます。');
 }
-// 配布用書き出し:レビュー・写真を埋め込んだ単体HTMLを生成(file://で開いても閲覧できる)
+// 配布用HTML向けに、起点から徒歩10分圏(約700m)の地図タイルをbase64で収集(z14〜z18、計約240枚・650KB程度)
+async function collectMapTiles(){
+  const R = 700, zs = [14,15,16,17,18];
+  const latR = R/111320, lngR = R/(111320*Math.cos(ORIGIN.lat*Math.PI/180));
+  const t2 = (lat,lng,z) => {
+    const n = 2**z;
+    return [Math.floor((lng+180)/360*n),
+            Math.floor((1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*n)];
+  };
+  const tiles = {};
+  let fail = 0;
+  for(const z of zs){
+    const [x0,y0] = t2(ORIGIN.lat+latR, ORIGIN.lng-lngR, z);
+    const [x1,y1] = t2(ORIGIN.lat-latR, ORIGIN.lng+lngR, z);
+    const jobs = [];
+    for(let x=x0; x<=x1; x++) for(let y=y0; y<=y1; y++){
+      jobs.push((async()=>{
+        try{
+          const r = await fetch(`https://a.basemaps.cartocdn.com/light_all/${z}/${x}/${y}.png`);
+          if(!r.ok){ fail++; return; }
+          const b = await r.blob();
+          const du = await new Promise(res=>{ const f = new FileReader(); f.onload = ()=>res(f.result); f.onerror = ()=>res(null); f.readAsDataURL(b); });
+          if(du) tiles[`${z}/${x}/${y}`] = du; else fail++;
+        }catch(e){ fail++; }
+      })());
+    }
+    await Promise.all(jobs);
+  }
+  return {tiles, n: Object.keys(tiles).length, fail,
+          minZoom: zs[0], maxZoom: zs[zs.length-1],
+          bounds: [[ORIGIN.lat-latR, ORIGIN.lng-lngR], [ORIGIN.lat+latR, ORIGIN.lng+lngR]]};
+}
+
+// 配布用書き出し:レビュー・写真・徒歩圏の地図タイルを埋め込んだ単体HTMLを生成(file://で開いても閲覧できる)
 async function exportStandalone(){
   let src = '';
   try{
@@ -2047,10 +2081,22 @@ async function exportStandalone(){
   const json = JSON.stringify(out).replace(/</g, '\\u003c');
   // 置換値に $ が含まれても特殊パターン($'等)として解釈されないよう関数で渡す
   src = src.replace('/*EMBED_REVIEWS*/', () => 'window.EMBEDDED_REVIEWS=' + json + ';');
+  // 徒歩10分圏の地図タイルを埋め込む(file://・オフラインでも地図が表示される)
+  let tileNote = '';
+  if(src.indexOf('/*EMBED_TILES*/') !== -1){
+    const mt = await collectMapTiles();
+    if(mt.n){
+      const tjson = JSON.stringify({tiles: mt.tiles, minZoom: mt.minZoom, maxZoom: mt.maxZoom, bounds: mt.bounds}).replace(/</g, '\\u003c');
+      src = src.replace('/*EMBED_TILES*/', () => 'window.EMBEDDED_TILES=' + tjson + ';');
+      tileNote = `\n地図は徒歩10分圏のタイル${mt.n}枚を埋め込み済み(オフラインでも表示。範囲外へは動かせません)。` + (mt.fail ? `※${mt.fail}枚は取得失敗。` : '');
+    }else{
+      tileNote = '\n※地図タイルを取得できなかったため地図は埋め込まれていません(表示にはネット接続が必要)。';
+    }
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([src], {type:'text/html'}));
   a.download = 'lunchmap-standalone.html'; a.click();
-  alert(`レビュー${n}件・写真${pn}枚(コメント・支払額込み)を埋め込んだHTMLを書き出しました。\nこのファイルだけ渡せば、開いた人はオフラインでもレビューと写真を見られます(地図タイルの表示にはネット接続が必要)。\n※写真が多いとファイルが数MBになります。`);
+  alert(`レビュー${n}件・写真${pn}枚(コメント・支払額込み)を埋め込んだHTMLを書き出しました。${tileNote}\nこのファイルだけ渡せば、開いた人はオフラインでもレビュー・写真・徒歩圏の地図を見られます。\n※写真が多いとファイルが数MBになります。`);
 }
 function importReviews(){
   const inp = document.createElement('input');
@@ -2223,13 +2269,24 @@ function initMap(){
     box.innerHTML = '<div class="mapfallback">地図ライブラリを読み込めませんでした。ネットワーク環境をご確認ください。<br>リストからは引き続き店舗を選べます。</div>';
     return;
   }
-  LMAP = L.map('lmap', {scrollWheelZoom:true}).setView([ORIGIN.lat, ORIGIN.lng], 16);
-  // 淡色シンプルスタイル(建物などの描画を最小限に、駅名・主要道路名は表示)
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19,
-    subdomains: 'abcd',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-  }).addTo(LMAP);
+  const emb = window.EMBEDDED_TILES; // 配布用HTMLに埋め込まれた徒歩圏の地図タイル(exportStandaloneで生成)
+  LMAP = L.map('lmap', Object.assign({scrollWheelZoom:true},
+    emb ? {minZoom: emb.minZoom, maxZoom: emb.maxZoom, maxBounds: emb.bounds, maxBoundsViscosity: 1} : {}))
+    .setView([ORIGIN.lat, ORIGIN.lng], 16);
+  const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+  if(emb){
+    // 埋め込みタイルのみで描画(file://では外部CARTOタイルが「APIキーが必要」表示になるため使わない。
+    // 範囲外は maxBounds で移動不可にし、灰色タイルやエラータイルを見せない)
+    const EmbTiles = L.TileLayer.extend({ getTileUrl: c => emb.tiles[c.z+'/'+c.x+'/'+c.y] || L.Util.emptyImageUrl });
+    new EmbTiles('', {minZoom: emb.minZoom, maxZoom: emb.maxZoom, attribution}).addTo(LMAP);
+  }else{
+    // 淡色シンプルスタイル(建物などの描画を最小限に、駅名・主要道路名は表示)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd',
+      attribution
+    }).addTo(LMAP);
+  }
 
   // 徒歩時間リング(片道)半径 = 分×80m÷経路係数1.3
   ringLayer = L.layerGroup();

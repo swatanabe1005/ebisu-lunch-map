@@ -168,10 +168,10 @@
   <div id="tabShops" hidden>
     <div class="toolbar">
       <input type="search" id="sq" placeholder="店名・カテゴリ・説明で検索">
-      <label style="font-size:12px;font-weight:700;color:var(--ink2);display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="rmOnly">除外中のみ</label>
+      <label style="font-size:12px;font-weight:700;color:var(--ink2);display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="rmOnly">削除済みのみ</label>
       <span class="count"><b id="shopCnt">0</b> 軒<span id="rmCnt"></span></span>
     </div>
-    <p style="font-size:12px;color:var(--ink2);margin-bottom:10px">カードをタップすると店の詳細(写真・共有レビュー)を表示。🚫でマップから除外(全端末、次回読み込み時に反映。レビューは残ります)、↩で復元。</p>
+    <p style="font-size:12px;color:var(--ink2);margin-bottom:10px">カードをタップすると店の詳細(写真・共有レビュー)を表示。🗑で店をマップから削除(全端末、次回読み込み時に反映)。<b>その店の共有レビューも削除され、元に戻せません。</b></p>
     <div class="msg" id="rmMsg"></div>
     <div class="cards" id="shopCards"></div>
     <div class="empty" id="shopEmpty" hidden>該当する店がありません。</div>
@@ -640,7 +640,7 @@ async function saveEdit(id){
   }catch(e){ alert('通信エラーで保存できませんでした。'); }
 }
 
-/* ===== 店一覧タブ(表示+マップからの除外/復元) ===== */
+/* ===== 店一覧タブ(表示+店の削除) ===== */
 let REMOVED = [];        // removed_shops の全行 {shop_id, created_at}
 let rmTableOk = true;    // false = テーブル未作成(SQL未実行)
 
@@ -651,16 +651,16 @@ async function loadRemoved(){
     if(r.status === 404){
       rmTableOk = false;
       msg.className = 'msg err';
-      msg.textContent = '除外テーブルが未作成のため除外/復元は使えません(一覧表示は可能)。Supabase の SQL Editor で supabase-removed-shops.sql を実行してください。';
+      msg.textContent = '削除テーブルが未作成のため店の削除は使えません(一覧表示は可能)。Supabase の SQL Editor で supabase-removed-shops.sql を実行してください。';
       renderShops();
       return;
     }
-    if(!r.ok){ msg.className = 'msg err'; msg.textContent = '除外リストの取得に失敗しました(エラー' + r.status + ')。'; return; }
+    if(!r.ok){ msg.className = 'msg err'; msg.textContent = '削除済みリストの取得に失敗しました(エラー' + r.status + ')。'; return; }
     rmTableOk = true;
     msg.textContent = '';
     REMOVED = await r.json();
     renderShops();
-  }catch(e){ msg.className = 'msg err'; msg.textContent = '通信エラーで除外リストを取得できませんでした。'; }
+  }catch(e){ msg.className = 'msg err'; msg.textContent = '通信エラーで削除済みリストを取得できませんでした。'; }
 }
 
 // 共有レビュー(ROWS)からの店別実績: 件数・平均星・支払額の中央値
@@ -686,7 +686,7 @@ function shopCard(s, rm){
       <span class="cat-badge" style="background:${col}">${escapeHtml(s.cat || '')}</span>
       <span class="pricetag">${ps && ps.yn ? `実績 ¥${ps.med.toLocaleString()}<span style="font-weight:400">(${ps.yn}件)</span>` : (PRICES[s.price] || '')}</span>
       <span class="openbadge ${badgeCls}">${st.label}</span>
-      ${rm ? '<span class="rm-badge">除外中</span>' : ''}
+      ${rm ? '<span class="rm-badge">削除済み</span>' : ''}
     </div>
     <div class="c-desc">${escapeHtml(s.desc || '')}</div>
     <div class="c-meta">
@@ -695,9 +695,8 @@ function shopCard(s, rm){
       <span class="gstar">G ${s.g != null ? s.g.toFixed(1) : '—'}</span>
       <span class="teamstar">${ps ? `${starStr(ps.avg)} ${ps.avg.toFixed(1)}(${ps.n}件)` : 'レビューなし'}</span>
     </div>
-    ${!rmTableOk ? '' : rm
-      ? `<button type="button" class="hidebtn" title="除外を解除" onclick="event.stopPropagation();restoreShop('${s.id}')">↩</button>`
-      : `<button type="button" class="hidebtn" title="マップから除外" onclick="event.stopPropagation();removeShop('${s.id}')">🚫</button>`}
+    ${!rmTableOk || rm ? '' :
+      `<button type="button" class="hidebtn" title="店を削除(レビューも削除)" onclick="event.stopPropagation();removeShop('${s.id}')">🗑</button>`}
   </div>`;
 }
 
@@ -718,50 +717,49 @@ function renderShops(){
   const list = SHOPS.filter(s =>
     (!rmOnly || removed.has(s.id)) &&
     (!q || normText(s.name + (s.cat||'') + (s.desc||'')).includes(q)));
-  // 除外中だが index.html に店データが残っていない店(データごと削除済み)
+  // 削除済みだが index.html に店データが残っていない店(データごと削除済み)
   const known = new Set(SHOPS.map(s => s.id));
   const orphans = REMOVED.filter(x => !known.has(x.shop_id) &&
     (!q || normText(shopName(x.shop_id)).includes(q) || normText(x.shop_id).includes(q)));
   $('shopCnt').textContent = list.length + orphans.length;
-  $('rmCnt').textContent = removed.size ? `(除外中 ${removed.size}軒)` : '';
+  $('rmCnt').textContent = removed.size ? `(削除済み ${removed.size}軒)` : '';
   $('shopEmpty').hidden = !!(list.length + orphans.length);
   $('shopEmpty').textContent = '該当する店がありません。';
   box.innerHTML = list.map(s => shopCard(s, removed.has(s.id))).join('')
     + orphans.map(x => `<div class="rm-row">
         <span class="rm-name">${escapeHtml(shopName(x.shop_id))}</span>
         <span class="rm-sid">${escapeHtml(x.shop_id)}</span>
-        <span class="rm-badge">除外中(店データなし)</span>
-        <button onclick="restoreShop('${x.shop_id}')">↩ 復元</button>
+        <span class="rm-badge">削除済み(店データなし)</span>
       </div>`).join('');
 }
 
 async function removeShop(id){
-  if(!confirm(`「${shopName(id)}」をマップから除外しますか?(レビューは残ります。あとで復元できます)`)) return;
+  const n = ROWS.filter(r => r.shop_id === id).length;
+  if(!confirm(`「${shopName(id)}」をマップから削除しますか?\nこの店の共有レビュー${n ? `(${n}件)` : ''}も削除されます。元に戻せません。`)) return;
   try{
     const res = await fetch(SB_URL + '/rest/v1/removed_shops', {
       method: 'POST',
       headers: head({'Content-Type': 'application/json', 'Prefer': 'return=representation'}),
       body: JSON.stringify({shop_id: id})
     });
-    if(res.status === 409){ alert('この店はすでに除外済みです。'); await loadRemoved(); return; }
-    if(!res.ok){ alert('除外に失敗しました(エラー' + res.status + ')。'); return; }
-    const row = (await res.json())[0];
-    if(row) REMOVED.unshift(row);
-    renderShops();
-  }catch(e){ alert('通信エラーで除外できませんでした。'); }
-}
-
-async function restoreShop(id){
-  if(!confirm(`「${shopName(id)}」の除外を解除して、マップに表示し直しますか?`)) return;
-  try{
-    const res = await fetch(SB_URL + '/rest/v1/removed_shops?shop_id=eq.' + encodeURIComponent(id), {
+    if(res.status !== 409){
+      if(!res.ok){ alert('削除に失敗しました(エラー' + res.status + ')。'); return; }
+      const row = (await res.json())[0];
+      if(row) REMOVED.unshift(row);
+    }
+    // 店の共有レビューも削除する
+    const dr = await fetch(SB_URL + '/rest/v1/reviews?shop_id=eq.' + encodeURIComponent(id), {
       method: 'DELETE',
       headers: head({'Prefer': 'return=minimal'})
     });
-    if(!res.ok){ alert('復元に失敗しました(エラー' + res.status + ')。'); return; }
-    REMOVED = REMOVED.filter(x => x.shop_id !== id);
+    if(!dr.ok){
+      alert('店はマップから削除しましたが、レビューの削除に失敗しました(エラー' + dr.status + ')。レビュータブから個別に削除してください。');
+    }else{
+      ROWS = ROWS.filter(x => x.shop_id !== id);
+      render();
+    }
     renderShops();
-  }catch(e){ alert('通信エラーで復元できませんでした。'); }
+  }catch(e){ alert('通信エラーで削除できませんでした。'); }
 }
 
 /* ===== 削除 ===== */
